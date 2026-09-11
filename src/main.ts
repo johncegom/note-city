@@ -25,8 +25,13 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     name. Press Play to hear it all and watch the playhead.
   </p>
   <button id="play-skyline" type="button">Play</button>
+  <button id="clear-skyline" type="button">Clear all</button>
   <canvas id="skyline" width="500" height="200"></canvas>
   <div id="hover-label">&nbsp;</div>
+  <p>Examples:</p>
+  <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
+  <button id="preset-1" type="button">Mary Had a Little Lamb</button>
+  <button id="preset-2" type="button">Ode to Joy (opening)</button>
 </section>
 `;
 
@@ -50,15 +55,16 @@ document
     playSingleNote({ id: "c5", midi: 72, start: 0, duration: 0.6, velocity: 0.8 });
   });
 
-// Starting 5-note set carried over from the P1.4 checkpoint. The editor (P1.5)
-// makes this list mutable: click to add, drag to edit.
-const notes: Note[] = [
-  { id: "n0", midi: 60, start: 0.0, duration: 0.5, velocity: 0.8 }, // C4
-  { id: "n1", midi: 67, start: 0.5, duration: 0.5, velocity: 0.8 }, // G4
-  { id: "n2", midi: 64, start: 1.0, duration: 0.5, velocity: 0.8 }, // E4
-  { id: "n3", midi: 72, start: 1.5, duration: 0.5, velocity: 0.8 }, // C5 — tallest
-  { id: "n4", midi: 65, start: 2.0, duration: 0.5, velocity: 0.8 }, // F4
-];
+// Seed: C major scale ascending, one note every 0.5s. Starting point for the
+// Phase 1 final checkpoint — Minh clears it and builds his own 8 notes.
+const SEED_MIDIS = [60, 62, 64, 65, 67, 69, 71, 72];
+const notes: Note[] = SEED_MIDIS.map((midi, i) => ({
+  id: `seed-${i}`,
+  midi,
+  start: i * 0.5,
+  duration: 0.5,
+  velocity: 0.8,
+}));
 
 const skylineOptions: SkylineOptions = {
   midiRange: { min: 60, max: 72 },
@@ -171,29 +177,72 @@ window.addEventListener("mouseup", () => {
 });
 
 document
-  .querySelector<HTMLButtonElement>("#play-skyline")!
+  .querySelector<HTMLButtonElement>("#clear-skyline")!
   .addEventListener("click", () => {
-    ctx ??= new AudioContext();
-    const now = ctx.currentTime;
-    const events = schedule(notes, now);
-    for (const event of events) {
-      playNote(ctx, event.freq, event.at, event.dur);
-    }
-
-    const totalDuration = Math.max(...notes.map((note) => note.start + note.duration));
-
-    function tick() {
-      const elapsed = ctx!.currentTime - now;
-      if (elapsed >= totalDuration) {
-        playheadTime = undefined;
-        render();
-        return;
-      }
-      playheadTime = elapsed;
-      render();
-      requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
+    notes.length = 0;
+    playheadTime = undefined;
+    render();
   });
+
+function playAll() {
+  if (notes.length === 0) return;
+  ctx ??= new AudioContext();
+  const now = ctx.currentTime;
+  const events = schedule(notes, now);
+  for (const event of events) {
+    playNote(ctx, event.freq, event.at, event.dur);
+  }
+
+  const totalDuration = Math.max(...notes.map((note) => note.start + note.duration));
+
+  function tick() {
+    const elapsed = ctx!.currentTime - now;
+    if (elapsed >= totalDuration) {
+      playheadTime = undefined;
+      render();
+      return;
+    }
+    playheadTime = elapsed;
+    render();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+document
+  .querySelector<HTMLButtonElement>("#play-skyline")!
+  .addEventListener("click", playAll);
+
+// A few well-known, simple tunes as listening reference points alongside the
+// P1.6 seed — Minh judges "pleasant/recognizable", not just "notes playing".
+const PRESETS: number[][] = [
+  [60, 60, 67, 67, 69, 69, 67], // Twinkle Twinkle Little Star (opening phrase)
+  [64, 62, 60, 62, 64, 64, 64], // Mary Had a Little Lamb (opening phrase)
+  [64, 64, 65, 67, 67, 65, 64, 62], // Ode to Joy (opening phrase)
+];
+
+function loadMelody(midis: number[]) {
+  notes.length = 0;
+  midis.forEach((midi, i) => {
+    notes.push({
+      id: `preset-${i}`,
+      midi,
+      start: i * 0.5,
+      duration: 0.5,
+      velocity: 0.8,
+    });
+  });
+  playheadTime = undefined;
+  render();
+}
+
+PRESETS.forEach((midis, i) => {
+  document
+    .querySelector<HTMLButtonElement>(`#preset-${i}`)!
+    .addEventListener("click", () => {
+      loadMelody(midis);
+      playAll();
+    });
+});
 
 render();
