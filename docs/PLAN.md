@@ -343,6 +343,9 @@ Problem: real singing slides between notes. Choice: v1 snaps to integers. Why: M
 **DR-5. YouTube handled outside the app.**
 Problem: downloading YouTube audio in the browser is blocked (CORS, ToS). Choice: `youtube-mcp download_audio` → file → app. Why: the tool exists, the 429 handling exists. Why not embed: adding a backend for one input path violates "subtract before add". Revisit when: YouTube becomes Minh's main input and the manual step is a real annoyance.
 
+**DR-6. CI on GitHub Actions: typecheck + test + build, required on `main`.**
+Problem: nothing enforced "`npm test` must be green before commit" once work moved to PRs — a red PR could still get merged by mistake. Choice: `.github/workflows/ci.yml` runs `tsc --noEmit`, `npm test`, `npm run build` on every push/PR targeting `main`; branch protection on `main` requires this check to pass before merge. Why: matches the existing local discipline, catches the same 3 failure classes (types, logic, bundling) cheaply on Node 22. Why not more (lint, coverage threshold): no linter or coverage tooling chosen yet — subtract before add; revisit if one is added for a task. Why not skip branch protection: a required-but-unenforced check gets ignored under time pressure. Revisit when: a task needs a second CI job (e.g. Basic Pitch model download at P2.3 makes `npm run build` slow) — split jobs then, not now.
+
 ---
 
 ## 11. Open questions
