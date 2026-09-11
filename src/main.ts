@@ -26,7 +26,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </p>
   <button id="play-skyline" type="button">Play</button>
   <button id="clear-skyline" type="button">Clear all</button>
-  <canvas id="skyline" width="500" height="200"></canvas>
+  <canvas id="skyline" width="700" height="200"></canvas>
   <div id="hover-label">&nbsp;</div>
   <p>Examples:</p>
   <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
@@ -115,11 +115,19 @@ type DragState = {
 
 let dragState: DragState | null = null;
 
+// The canvas is a fixed-width window onto time; a note (and its resize
+// handle) must never extend past it, or it renders clipped and becomes
+// ungrabbable (docs/BUGS.md BUG-2).
+function maxVisibleTime(): number {
+  return xToTime(canvas.width, skylineOptions.pxPerSec);
+}
+
 // v1 is a single melody, one note at a time (docs/PLAN.md section 1): a new
 // note that would overlap an existing one in time is not added.
 function addNoteAt(point: { x: number; y: number }): Note | null {
   const midi = snapMidi(yToMidi(point.y, skylineOptions), skylineOptions.midiRange);
-  const start = snapTime(xToTime(point.x, skylineOptions.pxPerSec), TIME_STEP);
+  const maxStart = maxVisibleTime() - DEFAULT_DURATION;
+  const start = Math.min(maxStart, snapTime(xToTime(point.x, skylineOptions.pxPerSec), TIME_STEP));
   const note: Note = {
     id: crypto.randomUUID(),
     midi,
@@ -163,7 +171,7 @@ window.addEventListener("mousemove", (event) => {
   } else {
     const deltaSec = xToTime(point.x - dragState.startX, skylineOptions.pxPerSec);
     const rawDuration = dragState.origDuration + deltaSec;
-    const cap = maxDurationAt(dragState.note, notes);
+    const cap = Math.min(maxDurationAt(dragState.note, notes), maxVisibleTime() - dragState.note.start);
     dragState.note.duration = Math.min(cap, Math.max(TIME_STEP, snapTime(rawDuration, TIME_STEP)));
   }
   render();
