@@ -24,6 +24,7 @@ new decision), or LEDGER section 6 (parked ideas) instead of folding them in.
 | P1.2 | Tests written first. Edge cases: midi outside 21..108, duration 0. Green. | `npm test` — new tests for `midiToFreq`, `midiToName`, `midiToHeight`, `durationToWidth` written and failing (red) before implementation, then passing (green). No Minh checkpoint (harness task). | yes (2026-09-12) |
 | P1.3 | Pure scheduler tested. **Minh checkpoint:** press 2 buttons, hear 2 notes 12 steps apart — Minh says which is higher. | `npm test` — `schedule(notes, now)` tests written red-first (empty array, one note, several notes, `now` offset applied). `playNote`/AudioContext wiring is `[skill]`, no automated test. Minh checkpoint: two buttons in the running app (`npm run dev`), one plays midi 60 (C4) one plays midi 72 (C5, 12 semitones up) — Minh listens and says which button's note is higher, verbatim recorded in section 3. | yes (2026-09-12) |
 | P1.4 | `[skill]`, no automated test (Canvas drawing). **Minh checkpoint:** look at 5 buildings, point to the tallest before listening, then listen to confirm. | `npm run dev` — render a fixed 5-note test set on `src/ui/skyline.ts`'s Canvas (vertical = midi via `midiToHeight`, horizontal = time via `durationToWidth`), with a playhead that advances during playback and hover showing the note name via `midiToName`. Minh points to the tallest building before playback, then plays and confirms by ear; verbatim recorded in section 3. | yes (2026-09-12) |
+| P1.8 | Tests written first, same edge cases as `midiToName`. **Minh checkpoint:** hover a few buildings, Minh says the label reads naturally to him (Đô Rê Mi..., not C D E). | `npm test` — `midiToSolfege(midi)` written red-first in `test/notes/mapping.test.ts`, same edge cases as the existing `midiToName` tests (each of the 12 pitch classes incl. sharps, octave boundaries, negative/high octaves). Hover-label wiring in `main.ts` to show solfège as the default name is `[skill]`, no automated test. Minh checkpoint: in `npm run dev`, hover a few buildings and confirm the label reads naturally (Đô4, Rê4, ...); verbatim recorded in section 3. | yes (2026-09-12) |
 
 ---
 
@@ -40,6 +41,7 @@ Status: `todo` | `doing` | `blocked` | `done`. "Actual" is counted in sessions. 
 | P1.5 | todo | 2 | | | |
 | P1.6 | todo | 0.5 | | | |
 | P1.7 | todo | 1 | | | |
+| P1.8 | doing | 0.5 | | | |
 | P2.1 | todo | 1–2 | | | |
 | P2.2 | todo | 0.5 | | | |
 | P2.3 | todo | 2 | | | |
@@ -99,7 +101,7 @@ From docs/PLAN.md section 11. Record the answer, keep the same numbering.
 |---|---|---|
 | Q1 | | |
 | Q2 | | |
-| Q3 | | |
+| Q3 | Solfège (Đô Rê Mi Fa Sol La Si), fixed-do, as the default label. Minh only knows solfège, not letter names. Recorded as DR-8, built as task P1.8. | 2026-09-12 |
 
 ---
 
