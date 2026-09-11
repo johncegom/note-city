@@ -294,3 +294,20 @@ code {
     border-right-color: var(--border);
   }
 }
+
+#skyline-section {
+  max-width: 600px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+#skyline {
+  border: 1px solid var(--border);
+  background: #fafafa;
+}
+
+#hover-label {
+  margin-top: 0.5rem;
+  font-family: var(--mono);
+  min-height: 1.5em;
+}
