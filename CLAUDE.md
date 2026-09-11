@@ -11,6 +11,11 @@ Scaffolded (P1.1): Vite + TypeScript (vanilla-ts template) + vitest.
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — preview the production build
 
+Remote: `origin` → https://github.com/johncegom/note-city, default branch `main`.
+P1.1 was committed directly to `main` (first task, repo bootstrap). **Every task after
+P1.1 uses its own branch, merged to `main` only via PR/MR** — see the Branching rule
+below.
+
 ## Session start protocol
 
 Read `PLAN.md` first, then `LEDGER.md` (status lives only in the ledger; the plan is stable and does not change during normal work). Skim `BUGS.md` and `RETRO.md` too — cheap, and either may change how the next task should be approached. Then:
@@ -24,6 +29,18 @@ Read `PLAN.md` first, then `LEDGER.md` (status lives only in the ledger; the pla
 7. Update `LEDGER.md` (task status table + one session-log row). Never edit `PLAN.md` status — it has none; status only lives in the ledger.
 8. Commit with the task ID as the message prefix, e.g. `P1.2: note mapping functions`. One task = one commit.
 9. If something happened this session that would change how a *different future* task gets approached (not just this one) — a process/tooling lesson, not a product bug or design tradeoff — add a `RETRO-N` entry to `RETRO.md`.
+10. Open a PR/MR to `main` and wait for it to be merged before starting the next task's branch — see Branching rule.
+
+## Branching rule (from P1.2 onward)
+
+`main` is protected by convention: no direct commits after P1.1. For each task:
+
+1. Branch off `main`: `git checkout -b <task-id>-<short-slug>` (e.g. `p1.2-note-mapping`).
+2. Do the task's full protocol above on that branch (approval gate, TDD red/green, ledger update, commit(s)).
+3. Push the branch, open a PR into `main` (`gh pr create`), and stop there — don't merge without Minh's go-ahead unless he's explicitly said to auto-merge.
+4. Once merged, `git checkout main && git pull` before branching for the next task.
+
+One task = one branch = one PR, mirroring "one task = one commit."
 
 ## Hard rules (from PLAN.md section 0)
 
