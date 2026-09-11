@@ -1,9 +1,9 @@
 # note-city — Ledger
 
-> The agent updates this file at the end of every session. `PLAN.md` does not change; all status lives here.
+> The agent updates this file at the end of every session. `docs/PLAN.md` does not change; all status lives here.
 > How to update: use `str_replace`, anchor on the last row of the table you are editing, add the new row right after it. Never rewrite the whole file. Escape `|` inside cell content.
 
-Plan followed: PLAN.md v1.0
+Plan followed: docs/PLAN.md v1.0
 Current phase: Phase 1
 Next task: P1.3
 
@@ -11,14 +11,14 @@ Next task: P1.3
 
 ## 1a. Task approval (do this before status moves to `doing`)
 
-For each task, before starting implementation: copy its DoD from `PLAN.md`, write a
+For each task, before starting implementation: copy its DoD from `docs/PLAN.md`, write a
 Test Plan (exact commands / exact Minh checkpoint question), and record it here.
 This is the approval gate — it exists so a task's scope and exit criteria are
 committed *before* work starts, not reconstructed from the diff afterward. Don't
-expand scope mid-task; log unrelated findings in `BUGS.md`, `PLAN.md` DR-N (via a
+expand scope mid-task; log unrelated findings in `docs/BUGS.md`, `docs/PLAN.md` DR-N (via a
 new decision), or LEDGER section 6 (parked ideas) instead of folding them in.
 
-| ID | DoD (copied from PLAN.md) | Test Plan (commands / checkpoint question) | Approved |
+| ID | DoD (copied from docs/PLAN.md) | Test Plan (commands / checkpoint question) | Approved |
 |---|---|---|---|
 | P1.1 | `npm run dev` opens a blank page. `npm test` green. | `npm run dev` manual check; `npm test` | yes (2026-09-12) |
 | P1.2 | Tests written first. Edge cases: midi outside 21..108, duration 0. Green. | `npm test` — new tests for `midiToFreq`, `midiToName`, `midiToHeight`, `durationToWidth` written and failing (red) before implementation, then passing (green). No Minh checkpoint (harness task). | yes (2026-09-12) |
@@ -76,7 +76,7 @@ Verbatim, short. This is learning evidence, not code evidence.
 
 ## 4. End-of-phase review
 
-Fill in at the end of each phase, or when a trigger in PLAN.md section 9 fires.
+Fill in at the end of each phase, or when a trigger in docs/PLAN.md section 9 fires.
 
 | Phase | Total est. | Total actual | Main cause of variance | Adjustment for next phase |
 |---|---|---|---|---|
@@ -87,7 +87,7 @@ Fill in at the end of each phase, or when a trigger in PLAN.md section 9 fires.
 
 ## 5. Open questions answered
 
-From PLAN.md section 11. Record the answer, keep the same numbering.
+From docs/PLAN.md section 11. Record the answer, keep the same numbering.
 
 | Q | Answer | Date |
 |---|---|---|
