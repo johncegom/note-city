@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteRect } from "../../src/ui/geometry";
+import { noteRect, xToTime, yToMidi } from "../../src/ui/geometry";
 import type { Note } from "../../src/notes/types";
 
 function makeNote(overrides: Partial<Note>): Note {
@@ -52,5 +52,36 @@ describe("noteRect", () => {
     const note = makeNote({ midi: 60 });
     const rect = noteRect(note, { ...baseOptions, minBarHeight: 20 });
     expect(rect.height).toBe(20);
+  });
+});
+
+describe("yToMidi", () => {
+  test("the bottom of the canvas maps to midiRange.min", () => {
+    expect(yToMidi(200, baseOptions)).toBeCloseTo(60);
+  });
+
+  test("the top of the canvas maps to midiRange.max", () => {
+    expect(yToMidi(0, baseOptions)).toBeCloseTo(72);
+  });
+
+  test("the middle of the canvas maps to the middle of the range", () => {
+    expect(yToMidi(100, baseOptions)).toBeCloseTo(66);
+  });
+
+  test("is the inverse of the y produced by noteRect for an in-range midi", () => {
+    const note = makeNote({ midi: 65 });
+    const rect = noteRect(note, baseOptions);
+    // noteRect anchors bars to the bottom, so compare against the rect's top edge.
+    expect(yToMidi(rect.y, baseOptions)).toBeCloseTo(65);
+  });
+});
+
+describe("xToTime", () => {
+  test("scales x by pxPerSec", () => {
+    expect(xToTime(200, 100)).toBeCloseTo(2);
+  });
+
+  test("x = 0 is time 0", () => {
+    expect(xToTime(0, 100)).toBe(0);
   });
 });

@@ -17,6 +17,17 @@ export type Rect = {
 
 const DEFAULT_MIN_BAR_HEIGHT = 6;
 
+/** Inverse of the vertical mapping in `noteRect`: a canvas y-coordinate to a raw (unsnapped) midi value. */
+export function yToMidi(y: number, options: SkylineOptions): number {
+  const heightFrac = (options.canvasHeight - y) / options.canvasHeight;
+  return options.midiRange.min + heightFrac * (options.midiRange.max - options.midiRange.min);
+}
+
+/** Inverse of the horizontal mapping in `noteRect`: a canvas x-coordinate to a raw (unsnapped) time in seconds. */
+export function xToTime(x: number, pxPerSec: number): number {
+  return x / pxPerSec;
+}
+
 /** The rectangle a note is drawn as: bottom-anchored, taller = higher pitch. */
 export function noteRect(note: Note, options: SkylineOptions): Rect {
   const minBarHeight = options.minBarHeight ?? DEFAULT_MIN_BAR_HEIGHT;
