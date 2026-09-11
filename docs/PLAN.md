@@ -1,7 +1,7 @@
 # note-city — Build Plan
 
-> Read this file at the start of every session. Then read `LEDGER.md` to know where things stand.
-> This file is stable. Status, results, and lessons live in `LEDGER.md`, not here.
+> Read this file at the start of every session. Then read `docs/LEDGER.md` to know where things stand.
+> This file is stable. Status, results, and lessons live in `docs/LEDGER.md`, not here.
 
 Plan version: 1.0 (2026-09-11)
 Project owner: Minh
@@ -22,17 +22,17 @@ Read carefully. These rules win over any ad-hoc judgment.
 6. **Explain each music term once**, the first time it appears, then stop. Minh does not know music theory. Assume nothing.
 7. **Minh learns by experiment, not by lecture.** When Minh asks "why does this note sound odd", offer an experiment first ("drag it up 2 steps and listen again") instead of theory.
 8. **One task, one commit.** Commit message starts with the task ID, e.g. `P1.2: note mapping functions`.
-9. **No scope growth mid-task.** New ideas go to `LEDGER.md` section "Parked ideas". Do not build them now.
+9. **No scope growth mid-task.** New ideas go to `docs/LEDGER.md` section "Parked ideas". Do not build them now.
 
 ### Session protocol
 
 ```
-1. Read PLAN.md → LEDGER.md
+1. Read docs/PLAN.md → docs/LEDGER.md
 2. Pick a task: lowest ID, not done, all dependencies done
 3. If [harness]: write test → run, see red → implement → run, see green
 4. If [skill]: build → hand to Minh → ask the checkpoint question → record Minh's words
 5. npm test must be green before commit
-6. Update LEDGER.md (status table + one session-log row)
+6. Update docs/LEDGER.md (status table + one session-log row)
 7. Commit with task ID
 ```
 
@@ -140,8 +140,11 @@ Phase 2 builds the upper half (input → transcribe) and wires it in.
 **Folder structure:**
 ```
 note-city/
-  PLAN.md
-  LEDGER.md
+  docs/
+    PLAN.md
+    LEDGER.md
+    BUGS.md
+    RETRO.md
   index.html
   src/
     notes/        # data model + pure functions (TDD)
@@ -332,7 +335,7 @@ Problem: need the shortest listen–drag–listen loop. Choice: TS + Web Audio +
 Problem: the first plan put AI transcription first and had no "change" step. Choice: reverse the order. Why: learning comes from changing and re-listening, not from looking. Phase 1 has no model risk. Why not in parallel: one person, one loop; parallel work dilutes the checkpoints. Revisit when: Minh finds Phase 1 too easy — then shorten it, do not skip it.
 
 **DR-3. Ledger separate from the plan.**
-Problem: the plan must stay stable so the agent trusts it; status changes every session. Choice: separate `LEDGER.md`, append-only. Why: the agent edits the ledger with `str_replace` anchored to the last row and never touches the plan; git diffs stay clean; matches the ledger workflow Minh already uses for youtube-critic. Why not integrated: a file that is both contract and journal means every append can accidentally alter the contract. Revisit when: the project becomes so small that 2 files is overkill (not expected).
+Problem: the plan must stay stable so the agent trusts it; status changes every session. Choice: separate `docs/LEDGER.md`, append-only. Why: the agent edits the ledger with `str_replace` anchored to the last row and never touches the plan; git diffs stay clean; matches the ledger workflow Minh already uses for youtube-critic. Why not integrated: a file that is both contract and journal means every append can accidentally alter the contract. Revisit when: the project becomes so small that 2 files is overkill (not expected).
 
 **DR-4. Snap pitch to integers (semitones).**
 Problem: real singing slides between notes. Choice: v1 snaps to integers. Why: Minh needs clear steps to understand "one step higher" before understanding "sliding". Why not keep fractional values: the skyline would have odd-height buildings with no visible steps. Revisit when: Minh asks "why does the singer's voice not match the building" — that is the moment to introduce pitch bend.

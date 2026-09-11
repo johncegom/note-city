@@ -1,4 +1,4 @@
-// Shared data contract. No module invents its own note shape (see PLAN.md section 4).
+// Shared data contract. No module invents its own note shape (see docs/PLAN.md section 4).
 
 export type Note = {
   id: string; // stable across edits
