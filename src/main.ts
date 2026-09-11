@@ -10,29 +10,47 @@ import { maxDurationAt, overlapsAny } from "./notes/overlap";
 import type { Note } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-<section id="center">
-  <h1>note-city playground</h1>
-  <p>Press a button, hear a note.</p>
-  <button id="play-c4" type="button">Play C4</button>
-  <button id="play-c5" type="button">Play C5</button>
-</section>
+<div class="wrap">
+  <header class="hero">
+    <h1 class="wordmark">note&#8209;city</h1>
+    <p class="tagline">
+      A small tool for building melodies. Every note is a building — taller
+      means higher, wider means longer.
+    </p>
+    <div class="button-row">
+      <button id="play-c4" type="button">Play C4</button>
+      <button id="play-c5" type="button">Play C5</button>
+    </div>
+  </header>
 
-<section id="skyline-section">
-  <h2>Skyline</h2>
-  <p>
-    Click empty space to add a building. Drag a building up/down to change its
-    pitch. Drag its right edge to change its length. Hover to see its note
-    name. Press Play to hear it all and watch the playhead.
-  </p>
-  <button id="play-skyline" type="button">Play</button>
-  <button id="clear-skyline" type="button">Clear all</button>
-  <canvas id="skyline" width="500" height="200"></canvas>
-  <div id="hover-label">&nbsp;</div>
-  <p>Examples:</p>
-  <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
-  <button id="preset-1" type="button">Mary Had a Little Lamb</button>
-  <button id="preset-2" type="button">Ode to Joy (opening)</button>
-</section>
+  <section id="skyline-section" class="panel">
+    <h2>Skyline</h2>
+    <p class="hint">
+      Click empty space to add a building. Drag a building up or down to
+      change its pitch. Drag its right edge to change its length. Hover to
+      see its note name. Press Play to hear it all and watch the playhead.
+    </p>
+
+    <div class="canvas-frame">
+      <canvas id="skyline" width="500" height="200"></canvas>
+    </div>
+    <div id="hover-label" class="readout">&nbsp;</div>
+
+    <div class="button-row">
+      <button id="play-skyline" type="button" class="primary">Play</button>
+      <button id="clear-skyline" type="button">Clear all</button>
+    </div>
+
+    <div class="presets">
+      <p class="presets-label">Examples</p>
+      <div class="button-row">
+        <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
+        <button id="preset-1" type="button">Mary Had a Little Lamb</button>
+        <button id="preset-2" type="button">Ode to Joy (opening)</button>
+      </div>
+    </div>
+  </section>
+</div>
 `;
 
 let ctx: AudioContext | null = null;
