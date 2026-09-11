@@ -5,7 +5,7 @@
 
 Plan followed: PLAN.md v1.0
 Current phase: Phase 1
-Next task: P1.2
+Next task: P1.3
 
 ---
 
@@ -21,6 +21,7 @@ new decision), or LEDGER section 6 (parked ideas) instead of folding them in.
 | ID | DoD (copied from PLAN.md) | Test Plan (commands / checkpoint question) | Approved |
 |---|---|---|---|
 | P1.1 | `npm run dev` opens a blank page. `npm test` green. | `npm run dev` manual check; `npm test` | yes (2026-09-12) |
+| P1.2 | Tests written first. Edge cases: midi outside 21..108, duration 0. Green. | `npm test` — new tests for `midiToFreq`, `midiToName`, `midiToHeight`, `durationToWidth` written and failing (red) before implementation, then passing (green). No Minh checkpoint (harness task). | yes (2026-09-12) |
 
 ---
 
@@ -31,7 +32,7 @@ Status: `todo` | `doing` | `blocked` | `done`. "Actual" is counted in sessions. 
 | ID | Status | Est. | Actual | Evidence | Done on |
 |---|---|---|---|---|---|
 | P1.1 | done | 1 | 1 | `npm test` green (1 test), `npm run dev` served 200 on :5173 | 2026-09-12 |
-| P1.2 | todo | 1 | | | |
+| P1.2 | done | 1 | 1 | `npm test` green (16 tests: mapping.test.ts + smoke.test.ts) | 2026-09-12 |
 | P1.3 | todo | 1 | | | |
 | P1.4 | todo | 1–2 | | | |
 | P1.5 | todo | 2 | | | |
@@ -55,6 +56,7 @@ One row per session. "Result" is the state at the end of the session, not a plan
 |---|---|---|---|---|---|
 | 2026-09-11 | 0 | — | Plan v1.0 and ledger created. No code yet. | — | P1.1: scaffold Vite + TS + vitest, smoke test green, commit |
 | 2026-09-12 | 1 | P1.1 | git repo initialized; scaffolded Vite vanilla-ts + vitest in project root (via temp subdir to avoid clobbering PLAN.md/LEDGER.md/CLAUDE.md/BUGS.md/RETRO.md); `npm test` (1 smoke test) and `npm run dev` both verified. Way-of-working docs (approval gate, bug/retro logs) also bootstrapped this session. | On estimate (1 session) | P1.2: `src/notes/` types and pure functions (midiToFreq, midiToName, midiToHeight, durationToWidth), tests first |
+| 2026-09-12 | 2 | P1.2 | Added `src/notes/types.ts` (Note, RawNote, Project, MidiRange per PLAN.md section 4) and `src/notes/mapping.ts` (midiToFreq, midiToName, midiToHeight, durationToWidth). Tests written first in `test/notes/mapping.test.ts`, seen red (module missing), then green after implementation. Edge cases covered: midi outside 21..108 range clamps to 0/1 in midiToHeight, duration 0 gives width 0. `npm test` green (16 tests), `tsc --noEmit` clean. | On estimate (1 session) | P1.3: `src/audio/synth.ts` (playNote) and `src/audio/scheduler.ts` (schedule), pure scheduler tested first; then Minh checkpoint (2 notes 12 steps apart) |
 
 ---
 
