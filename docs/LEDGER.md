@@ -5,7 +5,7 @@
 
 Plan followed: docs/PLAN.md v1.0
 Current phase: Phase 1
-Next task: P1.4
+Next task: P1.5
 
 ---
 
@@ -23,6 +23,7 @@ new decision), or LEDGER section 6 (parked ideas) instead of folding them in.
 | P1.1 | `npm run dev` opens a blank page. `npm test` green. | `npm run dev` manual check; `npm test` | yes (2026-09-12) |
 | P1.2 | Tests written first. Edge cases: midi outside 21..108, duration 0. Green. | `npm test` — new tests for `midiToFreq`, `midiToName`, `midiToHeight`, `durationToWidth` written and failing (red) before implementation, then passing (green). No Minh checkpoint (harness task). | yes (2026-09-12) |
 | P1.3 | Pure scheduler tested. **Minh checkpoint:** press 2 buttons, hear 2 notes 12 steps apart — Minh says which is higher. | `npm test` — `schedule(notes, now)` tests written red-first (empty array, one note, several notes, `now` offset applied). `playNote`/AudioContext wiring is `[skill]`, no automated test. Minh checkpoint: two buttons in the running app (`npm run dev`), one plays midi 60 (C4) one plays midi 72 (C5, 12 semitones up) — Minh listens and says which button's note is higher, verbatim recorded in section 3. | yes (2026-09-12) |
+| P1.4 | `[skill]`, no automated test (Canvas drawing). **Minh checkpoint:** look at 5 buildings, point to the tallest before listening, then listen to confirm. | `npm run dev` — render a fixed 5-note test set on `src/ui/skyline.ts`'s Canvas (vertical = midi via `midiToHeight`, horizontal = time via `durationToWidth`), with a playhead that advances during playback and hover showing the note name via `midiToName`. Minh points to the tallest building before playback, then plays and confirms by ear; verbatim recorded in section 3. | yes (2026-09-12) |
 
 ---
 
@@ -35,7 +36,7 @@ Status: `todo` | `doing` | `blocked` | `done`. "Actual" is counted in sessions. 
 | P1.1 | done | 1 | 1 | `npm test` green (1 test), `npm run dev` served 200 on :5173 | 2026-09-12 |
 | P1.2 | done | 1 | 1 | `npm test` green (16 tests: mapping.test.ts + smoke.test.ts) | 2026-09-12 |
 | P1.3 | done | 1 | 1 | `npm test` green (21 tests: scheduler.test.ts + mapping.test.ts + smoke.test.ts); checkpoint passed, see section 3 | 2026-09-12 |
-| P1.4 | todo | 1–2 | | | |
+| P1.4 | done | 1–2 | 1 | `npm test` green (32 tests: geometry.test.ts + hitTest.test.ts + scheduler.test.ts + mapping.test.ts + smoke.test.ts); checkpoint passed, see section 3 | 2026-09-12 |
 | P1.5 | todo | 2 | | | |
 | P1.6 | todo | 0.5 | | | |
 | P2.1 | todo | 1–2 | | | |
@@ -59,6 +60,7 @@ One row per session. "Result" is the state at the end of the session, not a plan
 | 2026-09-12 | 1 | P1.1 | git repo initialized; scaffolded Vite vanilla-ts + vitest in project root (via temp subdir to avoid clobbering PLAN.md/LEDGER.md/CLAUDE.md/BUGS.md/RETRO.md); `npm test` (1 smoke test) and `npm run dev` both verified. Way-of-working docs (approval gate, bug/retro logs) also bootstrapped this session. | On estimate (1 session) | P1.2: `src/notes/` types and pure functions (midiToFreq, midiToName, midiToHeight, durationToWidth), tests first |
 | 2026-09-12 | 2 | P1.2 | Added `src/notes/types.ts` (Note, RawNote, Project, MidiRange per PLAN.md section 4) and `src/notes/mapping.ts` (midiToFreq, midiToName, midiToHeight, durationToWidth). Tests written first in `test/notes/mapping.test.ts`, seen red (module missing), then green after implementation. Edge cases covered: midi outside 21..108 range clamps to 0/1 in midiToHeight, duration 0 gives width 0. `npm test` green (16 tests), `tsc --noEmit` clean. | On estimate (1 session) | P1.3: `src/audio/synth.ts` (playNote) and `src/audio/scheduler.ts` (schedule), pure scheduler tested first; then Minh checkpoint (2 notes 12 steps apart) |
 | 2026-09-12 | 3 | P1.3 | Added `src/audio/scheduler.ts` (`schedule(notes, now)`, pure), tests written first in `test/audio/scheduler.test.ts` (empty array, single note, `now` offset, multiple notes, no-mutation), seen red then green. Added `src/audio/synth.ts` (`playNote` with OscillatorNode + linear attack/release gain envelope, `[skill]`, no automated test). Replaced the Vite scaffold `main.ts`/`index.html` boilerplate with a minimal playground: two buttons (Play C4 / Play C5) wired through `schedule` + `playNote`. Removed now-unused `src/counter.ts`. Ran `npm run dev`, Minh pressed both buttons. `npm test` green (21 tests), `tsc --noEmit` and `npm run build` clean. Between sessions, also: PR #1 (P1.2) and PR #2 (docs → `docs/`) merged; added a new (not plan-listed) CI feature — `.github/workflows/ci.yml` running typecheck+test+build on Node 22, PR #3 merged, branch protection on `main` now requires it (recorded as DR-6 in `docs/PLAN.md`). | On estimate (1 session for P1.3); CI setup was an unplanned but requested addition, tracked outside the phase estimate | P1.4: `src/ui/skyline.ts` — draw `Note[]` as buildings on Canvas, playhead during playback, hover shows note name; Minh checkpoint (point to tallest building) |
+| 2026-09-12 | 4 | P1.4 | Added `src/ui/geometry.ts` (`noteRect`, pure — bottom-anchored bar geometry from midi/duration) and `src/ui/hitTest.ts` (`findNoteAt`, pure — point-in-rect over notes, topmost wins), both tests written first (red → green) in `test/ui/geometry.test.ts` and `test/ui/hitTest.test.ts`. Added `src/ui/skyline.ts` (`drawSkyline`, Canvas 2D drawing + playhead line, `[skill]`, no automated test). Wired into `main.ts`: a 5-note non-monotonic test set, hover shows note name via `midiToName`, a Play button animates the playhead with `requestAnimationFrame` against `AudioContext.currentTime`. `npm test` green (32 tests), `tsc --noEmit` and `npm run build` clean. Ran `npm run dev`; Minh checkpoint passed. | On estimate (1 session, within the 1–2 estimate) | P1.5: editor — click empty space to add a building, drag vertically to change midi (snap to integer), drag right edge to change duration; `hitTest`/`snapMidi`/`snapTime` pure and tested; Minh checkpoint (drag 1 step vs 12 steps) |
 
 ---
 
@@ -69,7 +71,7 @@ Verbatim, short. This is learning evidence, not code evidence.
 | Date | Checkpoint | Minh said |
 |---|---|---|
 | 2026-09-12 | P1.3 (2 notes, 12 steps apart) | "C5 is higher" (chose the C5 button as higher-pitched than C4) |
-| | P1.4 (point to the tallest building) | |
+| 2026-09-12 | P1.4 (point to the tallest building) | "4th building" (picked correctly before playback), then confirmed "Yes, it matched" after listening |
 | | P1.5 (drag 1 step vs 12 steps) | |
 | | P1.6 (build own 8 notes) | |
 | | P2.5 (skyline vs ear: matching and non-matching spots) | |
