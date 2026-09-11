@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   midiToFreq,
   midiToName,
+  midiToSolfege,
   midiToHeight,
   durationToWidth,
 } from "../../src/notes/mapping";
@@ -35,6 +36,49 @@ describe("midiToName", () => {
 
   test("0 is C-1", () => {
     expect(midiToName(0)).toBe("C-1");
+  });
+});
+
+describe("midiToSolfege", () => {
+  test("60 is Đô4 (fixed-do: Đô = C)", () => {
+    expect(midiToSolfege(60)).toBe("Đô4");
+  });
+
+  test("69 is La4 (fixed-do: La = A)", () => {
+    expect(midiToSolfege(69)).toBe("La4");
+  });
+
+  test("61 is Đô#4", () => {
+    expect(midiToSolfege(61)).toBe("Đô#4");
+  });
+
+  test("0 is Đô-1", () => {
+    expect(midiToSolfege(0)).toBe("Đô-1");
+  });
+
+  test("all 12 pitch classes in one octave", () => {
+    const expected = [
+      "Đô4",
+      "Đô#4",
+      "Rê4",
+      "Rê#4",
+      "Mi4",
+      "Fa4",
+      "Fa#4",
+      "Sol4",
+      "Sol#4",
+      "La4",
+      "La#4",
+      "Si4",
+    ];
+    for (let i = 0; i < 12; i++) {
+      expect(midiToSolfege(60 + i)).toBe(expected[i]);
+    }
+  });
+
+  test("octave number matches midiToName for the same midi", () => {
+    expect(midiToSolfege(72)).toBe("Đô5");
+    expect(midiToName(72)).toBe("C5");
   });
 });
 
