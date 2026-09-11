@@ -234,10 +234,11 @@ Why Phase 1 before Phase 2: this is the part that produces understanding. Transc
 | P1.4 | `src/ui/skyline.ts`: draw `Note[]` as buildings on Canvas. Vertical = midi, horizontal = time. Playhead moves during playback. Hover shows note name (C4, D4…). | skill | P1.2, P1.3 | 1–2 sessions | **Minh checkpoint:** look at 5 buildings, point to the tallest before listening, then listen to confirm. |
 | P1.5 | Editor: click empty space → add building. Drag vertically → change midi, snap to integer. Drag right edge → change duration. Release → play that note. `hitTest`, `snapMidi`, `snapTime` are pure. | harness + skill | P1.4 | 2 sessions | hitTest/snap tested. **Minh checkpoint:** drag a building up 1 step, listen; up 12 steps, listen — describe the difference in Minh's words. |
 | P1.6 | Seed: preload a simple 8-note melody (C major scale ascending: 60 62 64 65 67 69 71 72). "Clear all" and "Play" buttons. | skill | P1.5 | 0.5 session | **Phase 1 final checkpoint:** Minh clears the seed, builds 8 notes, says "sounds okay", and explains 1 choice. Record verbatim in the ledger. |
+| P1.7 | Frontend redesign of the Phase 1 playground (layout, type, color, spacing) using the `/frontend-design:frontend-design` skill for aesthetic direction. No new functionality — same buttons/canvas/editor, restyled. | skill | P1.6 | 1 session | **Minh checkpoint:** looking at the page, Minh says it reads as a considered design, not the default Vite scaffold look, and every existing control (buttons, canvas, hover label) still works exactly as before. |
 
 **First action (15–30 minutes):** P1.1. `npm create vite@latest note-city -- --template vanilla-ts`, add vitest, write `test/smoke.test.ts` with `expect(1+1).toBe(2)`, run green, commit `P1.1: scaffold`.
 
-**Phase 1 contingency:** total estimate 6.5–7.5 sessions. Hold ~20% extra (1.5 sessions) for Canvas/drag pixel issues — these usually take longer than planned.
+**Phase 1 contingency:** total estimate 7.5–8.5 sessions (includes P1.7, added after Phase 1 was already underway). Hold ~20% extra (1.5 sessions) for Canvas/drag pixel issues — these usually take longer than planned.
 
 ### Phase 2 — Real song into the skyline
 
@@ -345,6 +346,9 @@ Problem: downloading YouTube audio in the browser is blocked (CORS, ToS). Choice
 
 **DR-6. CI on GitHub Actions: typecheck + test + build, required on `main`.**
 Problem: nothing enforced "`npm test` must be green before commit" once work moved to PRs — a red PR could still get merged by mistake. Choice: `.github/workflows/ci.yml` runs `tsc --noEmit`, `npm test`, `npm run build` on every push/PR targeting `main`; branch protection on `main` requires this check to pass before merge. Why: matches the existing local discipline, catches the same 3 failure classes (types, logic, bundling) cheaply on Node 22. Why not more (lint, coverage threshold): no linter or coverage tooling chosen yet — subtract before add; revisit if one is added for a task. Why not skip branch protection: a required-but-unenforced check gets ignored under time pressure. Revisit when: a task needs a second CI job (e.g. Basic Pitch model download at P2.3 makes `npm run build` slow) — split jobs then, not now.
+
+**DR-7. Frontend redesign gets its own task (P1.7), sequenced after P1.6, not folded into P1.4/P1.5.**
+Problem: the Phase 1 UI has been default Vite-scaffold styling since P1.1; Minh asked to add a redesign task using the `/frontend-design:frontend-design` skill. Choice: a separate task, depending on P1.6 (all of Phase 1's functionality), instead of restyling piecemeal inside P1.4 (skyline) or P1.5 (editor). Why: restyling before the editor/seed exist means redoing it once more controls land — one pass over the finished Phase 1 surface is cheaper than several partial ones. Why not skip a formal task: it changes layout/type/color across the app, which is worth a Minh checkpoint like any other `[skill]` change, not a silent drive-by edit. Revisit when: Phase 2 adds enough new UI (file input, transcription progress) that another design pass is worth its own task.
 
 ---
 
