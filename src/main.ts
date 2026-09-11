@@ -1,7 +1,7 @@
 import "./style.css";
 import { schedule } from "./audio/scheduler";
 import { playNote } from "./audio/synth";
-import { midiToName } from "./notes/mapping";
+import { midiToName, midiToSolfege } from "./notes/mapping";
 import { drawSkyline } from "./ui/skyline";
 import { findNoteAt } from "./ui/hitTest";
 import { noteRect, xToTime, yToMidi, type SkylineOptions } from "./ui/geometry";
@@ -81,9 +81,13 @@ function pointFromEvent(event: MouseEvent) {
   return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
 }
 
+// Solfège (Đô Rê Mi...) is the default label — Minh knows that, not letter
+// names — with the letter name alongside for cross-reference (docs/PLAN.md DR-8).
 canvas.addEventListener("mousemove", (event) => {
   const hovered = findNoteAt(notes, pointFromEvent(event), skylineOptions);
-  hoverLabel.textContent = hovered ? midiToName(hovered.midi) : " ";
+  hoverLabel.textContent = hovered
+    ? `${midiToSolfege(hovered.midi)} (${midiToName(hovered.midi)})`
+    : " ";
 });
 
 canvas.addEventListener("mouseleave", () => {

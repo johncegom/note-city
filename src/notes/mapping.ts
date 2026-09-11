@@ -15,6 +15,23 @@ const NOTE_NAMES = [
   "B",
 ];
 
+// Fixed-do Vietnamese solfège: Đô always = C, regardless of key (v1 has no
+// key/scale concept — see docs/PLAN.md DR-8).
+const SOLFEGE_NAMES = [
+  "Đô",
+  "Đô#",
+  "Rê",
+  "Rê#",
+  "Mi",
+  "Fa",
+  "Fa#",
+  "Sol",
+  "Sol#",
+  "La",
+  "La#",
+  "Si",
+];
+
 /** Convert a MIDI note number to frequency in Hz. 69 (A4) = 440 Hz. */
 export function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
@@ -23,6 +40,13 @@ export function midiToFreq(midi: number): number {
 /** Convert a MIDI note number to a name like "C4", "C#4", "C-1". */
 export function midiToName(midi: number): string {
   const name = NOTE_NAMES[((midi % 12) + 12) % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  return `${name}${octave}`;
+}
+
+/** Convert a MIDI note number to a fixed-do solfège name like "Đô4", "Đô#4". */
+export function midiToSolfege(midi: number): string {
+  const name = SOLFEGE_NAMES[((midi % 12) + 12) % 12];
   const octave = Math.floor(midi / 12) - 1;
   return `${name}${octave}`;
 }
