@@ -14,6 +14,8 @@ const BUILDING_OUTLINE = "#8a5a1c";
 const WINDOW_LIT = "#fff3d6";
 const WINDOW_UNLIT_OUTLINE = "rgba(138, 90, 28, 0.35)";
 const PLAYHEAD_COLOR = "#7dd3e8";
+const POP_RING_COLOR = "#7dd3e8";
+const EDGE_STOP_COLOR = "#e86b5c";
 
 const WINDOW_WIDTH = 3;
 const WINDOW_HEIGHT = 5;
@@ -61,12 +63,21 @@ function drawWindows(ctx: CanvasRenderingContext2D, rect: Rect, seed: string): v
   }
 }
 
+// Instant feedback for the P1.11 editor: a brief "pop" ring on placement, and
+// a stop-cue highlight when a drag is pressed against the P1.10 canvas edge.
+export type SkylineEffects = {
+  popNoteId?: string;
+  popProgress?: number; // 0 (just placed) .. 1 (fully faded)
+  edgeStopCue?: boolean;
+};
+
 /** Draw `notes` as buildings: taller = higher pitch, wider = longer note. */
 export function drawSkyline(
   ctx: CanvasRenderingContext2D,
   notes: Note[],
   options: SkylineOptions,
   playheadTime?: number,
+  effects?: SkylineEffects,
 ): void {
   const canvas = ctx.canvas;
 
@@ -92,6 +103,25 @@ export function drawSkyline(
     ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
 
     drawWindows(ctx, rect, note.id);
+
+    if (effects?.popNoteId === note.id && effects.popProgress !== undefined) {
+      const progress = effects.popProgress;
+      const pad = 6 * progress; // ring expands outward as it fades
+      ctx.save();
+      ctx.globalAlpha = 1 - progress;
+      ctx.strokeStyle = POP_RING_COLOR;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(rect.x - pad, rect.y - pad, rect.width + pad * 2, rect.height + pad * 2);
+      ctx.restore();
+    }
+  }
+
+  if (effects?.edgeStopCue) {
+    ctx.save();
+    ctx.fillStyle = EDGE_STOP_COLOR;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(canvas.width - 3, 0, 3, options.canvasHeight);
+    ctx.restore();
   }
 
   if (playheadTime !== undefined) {

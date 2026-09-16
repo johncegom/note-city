@@ -1,12 +1,13 @@
 import "./style.css";
 import { schedule } from "./audio/scheduler";
 import { playNote } from "./audio/synth";
-import { midiToName, midiToSolfege } from "./notes/mapping";
-import { drawSkyline } from "./ui/skyline";
+import { midiToFreq, midiToName, midiToSolfege } from "./notes/mapping";
+import { drawSkyline, type SkylineEffects } from "./ui/skyline";
 import { findNoteAt } from "./ui/hitTest";
 import { noteRect, xToTime, yToMidi, type SkylineOptions } from "./ui/geometry";
 import { snapMidi, snapTime } from "./ui/snap";
 import { maxDurationAt, overlapsAny } from "./notes/overlap";
+import { pushHistory, undo } from "./ui/history";
 import type { Note } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -36,8 +37,11 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     </div>
     <div id="hover-label" class="readout">&nbsp;</div>
 
+    <p class="hint">Double-click a building to delete it.</p>
+
     <div class="button-row">
       <button id="play-skyline" type="button" class="primary">Play</button>
+      <button id="undo-skyline" type="button" disabled>Undo</button>
       <button id="clear-skyline" type="button">Clear all</button>
     </div>
 
@@ -55,10 +59,13 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 let ctx: AudioContext | null = null;
 
+// A preview should play right away, not at the note's position in the melody's
+// own timeline — so this plays at ctx.currentTime directly instead of going
+// through `schedule` (whose `now + note.start` offset is for `playAll`, where
+// notes must stay spaced apart from each other; see docs/BUGS.md BUG-3).
 function playSingleNote(note: Note) {
   ctx ??= new AudioContext();
-  const [event] = schedule([note], ctx.currentTime);
-  playNote(ctx, event.freq, event.at, event.dur);
+  playNote(ctx, midiToFreq(note.midi), ctx.currentTime, note.duration);
 }
 
 document
@@ -95,9 +102,42 @@ const canvasCtx = canvas.getContext("2d")!;
 const hoverLabel = document.querySelector<HTMLDivElement>("#hover-label")!;
 
 let playheadTime: number | undefined;
+let effects: SkylineEffects = {};
+
+// In-memory undo (P1.11): a stack of full `notes` snapshots, no persistence.
+// Each mutating action pushes the pre-edit state before applying the change.
+let historyStack: Note[][] = [];
+const undoButton = document.querySelector<HTMLButtonElement>("#undo-skyline")!;
+
+function snapshotNotes(): Note[] {
+  return notes.map((note) => ({ ...note }));
+}
+
+function recordHistory() {
+  historyStack = pushHistory(historyStack, snapshotNotes());
+  undoButton.disabled = historyStack.length === 0;
+}
 
 function render() {
-  drawSkyline(canvasCtx, notes, skylineOptions, playheadTime);
+  drawSkyline(canvasCtx, notes, skylineOptions, playheadTime, effects);
+}
+
+// Instant micro-feedback (P1.11a): a brief highlight ring on a newly placed note.
+function triggerPop(noteId: string) {
+  const start = performance.now();
+  const POP_DURATION_MS = 250;
+  function tick() {
+    const progress = Math.min(1, (performance.now() - start) / POP_DURATION_MS);
+    effects = { popNoteId: noteId, popProgress: progress };
+    render();
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      effects = {};
+      render();
+    }
+  }
+  requestAnimationFrame(tick);
 }
 
 function pointFromEvent(event: MouseEvent) {
@@ -129,6 +169,7 @@ type DragState = {
   mode: "pitch" | "duration";
   startX: number;
   origDuration: number;
+  origMidi: number;
 };
 
 let dragState: DragState | null = null;
@@ -154,6 +195,7 @@ function addNoteAt(point: { x: number; y: number }): Note | null {
     velocity: 0.8,
   };
   if (overlapsAny(note, notes)) return null;
+  recordHistory();
   notes.push(note);
   return note;
 }
@@ -163,9 +205,13 @@ canvas.addEventListener("mousedown", (event) => {
   const hovered = findNoteAt(notes, point, skylineOptions);
 
   if (!hovered) {
+    // Skip the click-to-add on the first click of a double-click — an empty
+    // spot has nothing to delete, so a double-click there shouldn't add-then-drag.
+    if (event.detail > 1) return;
     const note = addNoteAt(point);
     if (!note) return;
     render();
+    triggerPop(note.id);
     playSingleNote(note);
     return;
   }
@@ -177,7 +223,21 @@ canvas.addEventListener("mousedown", (event) => {
     mode: nearRightEdge ? "duration" : "pitch",
     startX: point.x,
     origDuration: hovered.duration,
+    origMidi: hovered.midi,
   };
+});
+
+canvas.addEventListener("dblclick", (event) => {
+  const point = pointFromEvent(event);
+  const hovered = findNoteAt(notes, point, skylineOptions);
+  if (!hovered) return;
+  dragState = null;
+  recordHistory();
+  const idx = notes.findIndex((n) => n.id === hovered.id);
+  if (idx >= 0) notes.splice(idx, 1);
+  playheadTime = undefined;
+  hoverLabel.textContent = " ";
+  render();
 });
 
 window.addEventListener("mousemove", (event) => {
@@ -186,25 +246,56 @@ window.addEventListener("mousemove", (event) => {
 
   if (dragState.mode === "pitch") {
     dragState.note.midi = snapMidi(yToMidi(point.y, skylineOptions), skylineOptions.midiRange);
+    effects = {};
+    hoverLabel.textContent = `${midiToSolfege(dragState.note.midi)} (${midiToName(dragState.note.midi)})`;
   } else {
     const deltaSec = xToTime(point.x - dragState.startX, skylineOptions.pxPerSec);
     const rawDuration = dragState.origDuration + deltaSec;
-    const cap = Math.min(maxDurationAt(dragState.note, notes), maxVisibleTime() - dragState.note.start);
-    dragState.note.duration = Math.min(cap, Math.max(TIME_STEP, snapTime(rawDuration, TIME_STEP)));
+    const edgeCap = maxVisibleTime() - dragState.note.start;
+    const cap = Math.min(maxDurationAt(dragState.note, notes), edgeCap);
+    const snapped = Math.max(TIME_STEP, snapTime(rawDuration, TIME_STEP));
+    dragState.note.duration = Math.min(cap, snapped);
+    // Stop-cue (P1.11c): only when the canvas's right edge, not a neighboring
+    // note, is the reason the drag can't go further (docs/BUGS.md BUG-2 clamp).
+    effects = cap === edgeCap && snapped >= cap ? { edgeStopCue: true } : {};
+    hoverLabel.textContent = `${midiToName(dragState.note.midi)} · ${dragState.note.duration.toFixed(2)}s`;
   }
   render();
 });
 
 window.addEventListener("mouseup", () => {
   if (!dragState) return;
-  const note = dragState.note;
+  const { note, origMidi, origDuration } = dragState;
   dragState = null;
+  effects = {};
+  if (note.midi !== origMidi || note.duration !== origDuration) {
+    // History must hold the pre-drag values, not the just-mutated note.
+    const preDrag = snapshotNotes().map((n) =>
+      n.id === note.id ? { ...n, midi: origMidi, duration: origDuration } : n,
+    );
+    historyStack = pushHistory(historyStack, preDrag);
+    undoButton.disabled = historyStack.length === 0;
+  }
+  render();
   playSingleNote(note);
+});
+
+undoButton.addEventListener("click", () => {
+  const { previous, stack } = undo(historyStack);
+  historyStack = stack;
+  undoButton.disabled = historyStack.length === 0;
+  if (previous === undefined) return;
+  notes.length = 0;
+  notes.push(...previous.map((n) => ({ ...n })));
+  playheadTime = undefined;
+  render();
 });
 
 document
   .querySelector<HTMLButtonElement>("#clear-skyline")!
   .addEventListener("click", () => {
+    if (notes.length === 0) return;
+    recordHistory();
     notes.length = 0;
     playheadTime = undefined;
     render();
@@ -248,6 +339,7 @@ const PRESETS: number[][] = [
 ];
 
 function loadMelody(midis: number[]) {
+  recordHistory();
   notes.length = 0;
   midis.forEach((midi, i) => {
     notes.push({
