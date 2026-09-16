@@ -91,6 +91,66 @@ Re-run calibration (see the `/bootstrap-way-of-working` skill) if any of these h
 - The project starts handling anything beyond Minh's own local use (other users, real money, credentials, shared data) — round the process up further, not down.
 - Any log (`docs/BUGS.md`, `docs/RETRO.md`, `docs/PLAN.md` DR-N) goes several tasks without an entry even though tasks of the kind it should catch clearly happened, or the approval-gate row in `docs/LEDGER.md` 1a is being written after the code instead of before — either is the "looks authoritative while being stale" failure; name it to Minh and consider lightening that specific artifact rather than leaving it to rot.
 
+## Execute / Advise / Grade / Dream — agent-spawn mechanism
+
+This repo has a standing mechanism for spawning a fresh, role-scoped
+`Agent` call mid-task. Rationale for why these roles exist and why the
+call must be a genuinely separate spawn (not just "think about it more in
+the same context") is in `docs/execute-advise-grade-dream.md` — read it
+once, then follow the triggers below directly without re-deriving them.
+
+Default mode is **Execute**: doing the task per the Session start protocol
+above. The other three only fire on their specific trigger:
+
+**Advise.** Trigger: you hit a decision that is genuinely ambiguous *and*
+costly to unwind if wrong — the kind that would reasonably become a DR-N
+in `docs/PLAN.md`, but you need input before writing code, not just a
+record after. (Most ambiguity in this repo should already be resolved by
+the human approval gate in the Session start protocol — reach for Advise
+only when that isn't enough, e.g. the ambiguity is technical/architectural
+rather than something to ask Minh.) Action: call the `Agent` tool with
+`model: claude-opus-5`. The prompt must contain only the specific decision
+and the minimum context needed to resolve it — not the whole session
+transcript, not unrelated task history. Wait for the reply before
+continuing Execute; do not proceed on your own guess in the meantime.
+
+**Grade.** Trigger: a `[harness]` task's output is finished (tests green,
+code written) and you want an independent check against its DoD before
+marking it done in the ledger. (Does not apply to `[skill]` tasks — those
+are never self-marked done by any agent, only by Minh's own words, per the
+Hard rules above; Grade is not a substitute for that.) Action: call the
+`Agent` tool with `model: claude-haiku-4-5-20251001`. The prompt must
+contain only the task's DoD (copied from `docs/PLAN.md`) plus the finished
+diff/output — explicitly withhold your own reasoning about how you got
+there, so the check is independent. Default fail path for this repo:
+**targeted fix**, not a full rerun — fix the specific gap Grade names,
+then re-run `npm test`, rather than redoing the task from scratch. Only
+fall back to a full rerun if Grade's finding suggests the whole approach
+was wrong, not just incomplete.
+
+**Dream.** Trigger: a Grade pass returns a finding — pass or fail — that
+looks like it would generalize beyond this one task (a process gap, a
+recurring kind of mistake, a pattern worth remembering across sessions).
+Do not fire Dream on every Grade result; most Grade passes have nothing
+worth persisting. Action: call the `Agent` tool with `model:
+claude-opus-5`, giving it the full run history (your reasoning, any
+Advise exchange, the Grade verdict). It decides what's actually
+generalizable versus noise. Its output gets written to
+`docs/RETRO.md` as a new `RETRO-N` entry (same format as existing entries)
+— that is the named, real file path Dream writes to in this repo. A
+lesson scoped to only this one task still goes in the ledger's session-log
+row instead, per the existing Hard rules — Dream is only for the
+repo-wide kind.
+
+**Re-calibration for this mechanism.** If Advise ends up firing on nearly
+every task rather than rarely, the point of routing it to a pricier model
+is gone — come back and either narrow the trigger or drop the model tier.
+If any of the three roles goes a long stretch (several tasks) without
+firing even once despite tasks of the kind it should catch clearly
+happening, that's a sign the trigger is miscalibrated or the role isn't
+needed — name it to Minh and consider removing it rather than leaving it
+as unused ceremony here.
+
 ## Full plan and history
 
 `docs/PLAN.md` is the stable contract: goals, architecture, per-task DoD, dependency allow-list, risk/fallback table, and decision records (DR-1..DR-5) with rationale for every major choice (TS-in-browser over Python/Go, Phase 1-before-Phase 2 ordering, ledger split from plan, integer pitch snapping, YouTube handled outside the app). Read it in full before starting work — this file is a summary, not a replacement. Log a new deliberate tradeoff as `DR-N` there when a reasonable person might have chosen differently.
