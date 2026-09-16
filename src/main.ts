@@ -8,6 +8,7 @@ import { noteRect, xToTime, yToMidi, type SkylineOptions } from "./ui/geometry";
 import { snapMidi, snapTime } from "./ui/snap";
 import { maxDurationAt, overlapsAny } from "./notes/overlap";
 import { pushHistory, undo } from "./ui/history";
+import { decodeFile, TARGET_SAMPLE_RATE } from "./audio/decode";
 import type { Note } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -53,6 +54,16 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
         <button id="preset-2" type="button">Ode to Joy (opening)</button>
       </div>
     </div>
+  </section>
+
+  <section id="import-section" class="panel">
+    <h2>Import audio (P2.1 test)</h2>
+    <p class="hint">
+      Decode-only check: picks a file, runs it through decode &rarr; mono &rarr;
+      resample, reports the result. Not wired into the skyline yet (P2.5).
+    </p>
+    <input id="import-file" type="file" accept="audio/*,video/*" />
+    <div id="import-status" class="readout">&nbsp;</div>
   </section>
 </div>
 `;
@@ -362,5 +373,24 @@ PRESETS.forEach((midis, i) => {
       playAll();
     });
 });
+
+// [skill] — P2.1 decode-only smoke test, no automated test (DR-11): pick a
+// file, confirm it decodes without error and comes out mono at 22050 Hz.
+const importStatus = document.querySelector<HTMLDivElement>("#import-status")!;
+document
+  .querySelector<HTMLInputElement>("#import-file")!
+  .addEventListener("change", async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    importStatus.textContent = `Decoding ${file.name}...`;
+    try {
+      const pcm = await decodeFile(file);
+      const durationSec = pcm.length / TARGET_SAMPLE_RATE;
+      importStatus.textContent =
+        `${file.name}: ${durationSec.toFixed(2)}s, ${pcm.length} samples @ ${TARGET_SAMPLE_RATE} Hz mono`;
+    } catch (err) {
+      importStatus.textContent = `Failed to decode ${file.name}: ${(err as Error).message}`;
+    }
+  });
 
 render();
