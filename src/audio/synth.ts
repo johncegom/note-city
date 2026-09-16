@@ -27,14 +27,15 @@ function getMasterBus(ctx: AudioContext): DynamicsCompressorNode {
 /**
  * Play one note: an oscillator at `freq` Hz, starting at `start` (AudioContext
  * time, seconds) for `dur` seconds. A short attack/release gain envelope
- * avoids the click of switching the oscillator on/off abruptly.
+ * avoids the click of switching the oscillator on/off abruptly. Returns the
+ * oscillator so a caller can stop it early (docs/BUGS.md BUG-4).
  */
 export function playNote(
   ctx: AudioContext,
   freq: number,
   start: number,
   dur: number,
-): void {
+): OscillatorNode {
   const osc = ctx.createOscillator();
   osc.frequency.value = freq;
 
@@ -49,4 +50,5 @@ export function playNote(
 
   osc.start(start);
   osc.stop(start + dur);
+  return osc;
 }

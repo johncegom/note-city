@@ -44,6 +44,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
     <div class="button-row">
       <button id="play-skyline" type="button" class="primary">Play</button>
+      <button id="stop-skyline" type="button">Stop</button>
       <button id="undo-skyline" type="button" disabled>Undo</button>
       <button id="clear-skyline" type="button">Clear all</button>
     </div>
@@ -70,6 +71,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <div class="button-row">
       <button id="play-original" type="button" disabled>Play original audio</button>
       <button id="play-synth-song" type="button" disabled>Play synth</button>
+      <button id="stop-song" type="button">Stop</button>
     </div>
   </section>
 </div>
@@ -324,14 +326,47 @@ document
     render();
   });
 
+// Tracks whatever's currently playing (skyline melody, or P2.5's original/synth
+// song playback) so a Stop button can cut it off early instead of having to
+// run out (docs/BUGS.md BUG-4). Single shared state since only one of these
+// plays at a time in practice — starting a new one stops whatever's active.
+let activeOscillators: OscillatorNode[] = [];
+let activeSource: AudioBufferSourceNode | null = null;
+let activeAnimationFrame: number | null = null;
+
+function stopPlayback() {
+  const now = ctx?.currentTime ?? 0;
+  for (const osc of activeOscillators) {
+    try {
+      osc.stop(now);
+    } catch {
+      // already stopped
+    }
+  }
+  activeOscillators = [];
+  if (activeSource) {
+    try {
+      activeSource.stop(now);
+    } catch {
+      // already stopped
+    }
+    activeSource = null;
+  }
+  if (activeAnimationFrame !== null) {
+    cancelAnimationFrame(activeAnimationFrame);
+    activeAnimationFrame = null;
+  }
+  playheadTime = undefined;
+  render();
+}
+
 function playAll() {
   if (notes.length === 0) return;
+  stopPlayback();
   ctx ??= new AudioContext();
   const now = ctx.currentTime;
   const events = schedule(notes, now);
-  for (const event of events) {
-    playNote(ctx, event.freq, event.at, event.dur);
-  }
+  activeOscillators = events.map((event) => playNote(ctx!, event.freq, event.at, event.dur));
 
   const totalDuration = Math.max(...notes.map((note) => note.start + note.duration));
 
@@ -339,19 +374,25 @@ function playAll() {
     const elapsed = ctx!.currentTime - now;
     if (elapsed >= totalDuration) {
       playheadTime = undefined;
+      activeOscillators = [];
+      activeAnimationFrame = null;
       render();
       return;
     }
     playheadTime = elapsed;
     render();
-    requestAnimationFrame(tick);
+    activeAnimationFrame = requestAnimationFrame(tick);
   }
-  requestAnimationFrame(tick);
+  activeAnimationFrame = requestAnimationFrame(tick);
 }
 
 document
   .querySelector<HTMLButtonElement>("#play-skyline")!
   .addEventListener("click", playAll);
+
+document
+  .querySelector<HTMLButtonElement>("#stop-skyline")!
+  .addEventListener("click", stopPlayback);
 
 // A few well-known, simple tunes as listening reference points alongside the
 // P1.6 seed — Minh judges "pleasant/recognizable", not just "notes playing".
@@ -444,12 +485,14 @@ document
 // skylineOptions.pxPerSec as playAll(), so it moves in sync with the skyline.
 function playOriginal() {
   if (!originalPcm) return;
+  stopPlayback();
   ctx ??= new AudioContext();
   const buffer = ctx.createBuffer(1, originalPcm.length, TARGET_SAMPLE_RATE);
   buffer.getChannelData(0).set(originalPcm);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
+  activeSource = source;
   const now = ctx.currentTime;
   source.start(now);
 
@@ -457,17 +500,22 @@ function playOriginal() {
     const elapsed = ctx!.currentTime - now;
     if (elapsed >= originalDurationSec) {
       playheadTime = undefined;
+      activeSource = null;
+      activeAnimationFrame = null;
       render();
       return;
     }
     playheadTime = elapsed;
     render();
-    requestAnimationFrame(tick);
+    activeAnimationFrame = requestAnimationFrame(tick);
   }
-  requestAnimationFrame(tick);
+  activeAnimationFrame = requestAnimationFrame(tick);
 }
 
 playOriginalButton.addEventListener("click", playOriginal);
 playSynthSongButton.addEventListener("click", playAll);
+document
+  .querySelector<HTMLButtonElement>("#stop-song")!
+  .addEventListener("click", stopPlayback);
 
 render();
