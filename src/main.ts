@@ -4,11 +4,13 @@ import { playNote } from "./audio/synth";
 import { midiToFreq, midiToName, midiToSolfege } from "./notes/mapping";
 import { drawSkyline, type SkylineEffects } from "./ui/skyline";
 import { findNoteAt } from "./ui/hitTest";
-import { noteRect, xToTime, yToMidi, type SkylineOptions } from "./ui/geometry";
+import { fitSkylineOptions, noteRect, xToTime, yToMidi, type SkylineOptions } from "./ui/geometry";
 import { snapMidi, snapTime } from "./ui/snap";
 import { maxDurationAt, overlapsAny } from "./notes/overlap";
 import { pushHistory, undo } from "./ui/history";
 import { decodeFile, TARGET_SAMPLE_RATE } from "./audio/decode";
+import { transcribe } from "./transcribe/basicPitch";
+import { filterLowConfidence, filterShort, mergeAdjacent } from "./notes/clean";
 import type { Note } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -57,13 +59,18 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </section>
 
   <section id="import-section" class="panel">
-    <h2>Import audio (P2.1 test)</h2>
+    <h2>Load a real song</h2>
     <p class="hint">
-      Decode-only check: picks a file, runs it through decode &rarr; mono &rarr;
-      resample, reports the result. Not wired into the skyline yet (P2.5).
+      Pick an audio or video file (&le; 60s works best). It's decoded, run
+      through Basic Pitch to find notes, cleaned up, then drawn on the
+      skyline above &mdash; replacing whatever's there now.
     </p>
     <input id="import-file" type="file" accept="audio/*,video/*" />
     <div id="import-status" class="readout">&nbsp;</div>
+    <div class="button-row">
+      <button id="play-original" type="button" disabled>Play original audio</button>
+      <button id="play-synth-song" type="button" disabled>Play synth</button>
+    </div>
   </section>
 </div>
 `;
@@ -102,11 +109,15 @@ const notes: Note[] = SEED_MIDIS.map((midi, i) => ({
   velocity: 0.8,
 }));
 
-const skylineOptions: SkylineOptions = {
+// The Phase 1 hand-placed editor's fixed scale. A loaded real song refits
+// this (see fitSkylineOptions) since its pitch range/duration are unknown
+// ahead of time; Clear all / a preset restores this default.
+const DEFAULT_SKYLINE_OPTIONS: SkylineOptions = {
   midiRange: { min: 60, max: 72 },
   pxPerSec: 100,
   canvasHeight: 200,
 };
+let skylineOptions: SkylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
 
 const canvas = document.querySelector<HTMLCanvasElement>("#skyline")!;
 const canvasCtx = canvas.getContext("2d")!;
@@ -308,6 +319,7 @@ document
     if (notes.length === 0) return;
     recordHistory();
     notes.length = 0;
+    skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
     playheadTime = undefined;
     render();
   });
@@ -361,6 +373,7 @@ function loadMelody(midis: number[]) {
       velocity: 0.8,
     });
   });
+  skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
   playheadTime = undefined;
   render();
 }
@@ -374,23 +387,87 @@ PRESETS.forEach((midis, i) => {
     });
 });
 
-// [skill] — P2.1 decode-only smoke test, no automated test (DR-11): pick a
-// file, confirm it decodes without error and comes out mono at 22050 Hz.
+// P2.5: file -> decode -> transcribe -> clean -> skyline. Thresholds are
+// fixed defaults, not exposed in the UI yet — if a real clip's checkpoint
+// shows notes too sparse/noisy, this is where to adjust (docs/PLAN.md:
+// "raise the threshold... do not touch the model").
+const MIN_NOTE_DURATION_SEC = 0.05;
+const MIN_CONFIDENCE = 0.3;
+const MERGE_GAP_SEC = 0.05;
+
+let originalPcm: Float32Array | null = null;
+let originalDurationSec = 0;
+
 const importStatus = document.querySelector<HTMLDivElement>("#import-status")!;
+const playOriginalButton = document.querySelector<HTMLButtonElement>("#play-original")!;
+const playSynthSongButton = document.querySelector<HTMLButtonElement>("#play-synth-song")!;
+
 document
   .querySelector<HTMLInputElement>("#import-file")!
   .addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    playOriginalButton.disabled = true;
+    playSynthSongButton.disabled = true;
     importStatus.textContent = `Decoding ${file.name}...`;
     try {
       const pcm = await decodeFile(file);
-      const durationSec = pcm.length / TARGET_SAMPLE_RATE;
+      originalPcm = pcm;
+      originalDurationSec = pcm.length / TARGET_SAMPLE_RATE;
+
+      importStatus.textContent = `Transcribing ${file.name}... (this can take a while)`;
+      const raw = await transcribe(pcm);
+      const cleaned = mergeAdjacent(
+        filterShort(filterLowConfidence(raw, MIN_CONFIDENCE), MIN_NOTE_DURATION_SEC),
+        MERGE_GAP_SEC,
+      );
+
+      recordHistory();
+      notes.length = 0;
+      notes.push(...cleaned);
+      skylineOptions = fitSkylineOptions(notes, canvas.width, skylineOptions.canvasHeight);
+      playheadTime = undefined;
+      render();
+
       importStatus.textContent =
-        `${file.name}: ${durationSec.toFixed(2)}s, ${pcm.length} samples @ ${TARGET_SAMPLE_RATE} Hz mono`;
+        `${file.name}: ${originalDurationSec.toFixed(2)}s, ${cleaned.length} notes found`;
+      playOriginalButton.disabled = false;
+      playSynthSongButton.disabled = notes.length === 0;
     } catch (err) {
-      importStatus.textContent = `Failed to decode ${file.name}: ${(err as Error).message}`;
+      originalPcm = null;
+      importStatus.textContent = `Failed to process ${file.name}: ${(err as Error).message}`;
     }
   });
+
+// Plays the decoded PCM directly (not through notes/synth), so Minh can
+// compare the skyline against the real recording. Playhead uses the same
+// skylineOptions.pxPerSec as playAll(), so it moves in sync with the skyline.
+function playOriginal() {
+  if (!originalPcm) return;
+  ctx ??= new AudioContext();
+  const buffer = ctx.createBuffer(1, originalPcm.length, TARGET_SAMPLE_RATE);
+  buffer.getChannelData(0).set(originalPcm);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  const now = ctx.currentTime;
+  source.start(now);
+
+  function tick() {
+    const elapsed = ctx!.currentTime - now;
+    if (elapsed >= originalDurationSec) {
+      playheadTime = undefined;
+      render();
+      return;
+    }
+    playheadTime = elapsed;
+    render();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+playOriginalButton.addEventListener("click", playOriginal);
+playSynthSongButton.addEventListener("click", playAll);
 
 render();
