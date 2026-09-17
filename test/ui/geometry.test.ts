@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteRect, xToTime, yToMidi } from "../../src/ui/geometry";
+import { fitSkylineOptions, noteRect, xToTime, yToMidi } from "../../src/ui/geometry";
 import type { Note } from "../../src/notes/types";
 
 function makeNote(overrides: Partial<Note>): Note {
@@ -83,5 +83,70 @@ describe("xToTime", () => {
 
   test("x = 0 is time 0", () => {
     expect(xToTime(0, 100)).toBe(0);
+  });
+});
+
+describe("fitSkylineOptions", () => {
+  test("empty notes array returns sane defaults, no divide-by-zero", () => {
+    const options = fitSkylineOptions([], 700, 200);
+    expect(options.canvasHeight).toBe(200);
+    expect(Number.isFinite(options.pxPerSec)).toBe(true);
+    expect(options.pxPerSec).toBeGreaterThan(0);
+    expect(options.midiRange.max).toBeGreaterThan(options.midiRange.min);
+  });
+
+  test("single note gets at least the minimum midi span, centered on it", () => {
+    const notes = [makeNote({ midi: 60, start: 0, duration: 1 })];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.midiRange.max - options.midiRange.min).toBeGreaterThanOrEqual(12);
+    expect(60).toBeGreaterThanOrEqual(options.midiRange.min);
+    expect(60).toBeLessThanOrEqual(options.midiRange.max);
+  });
+
+  test("wide pitch spread widens the range beyond the minimum span, with padding", () => {
+    const notes = [
+      makeNote({ id: "a", midi: 48, start: 0, duration: 1 }),
+      makeNote({ id: "b", midi: 84, start: 1, duration: 1 }),
+    ];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.midiRange.min).toBeLessThan(48);
+    expect(options.midiRange.max).toBeGreaterThan(84);
+  });
+
+  test("range never exceeds the piano range (21..108)", () => {
+    const notes = [
+      makeNote({ id: "a", midi: 24, start: 0, duration: 1 }),
+      makeNote({ id: "b", midi: 104, start: 1, duration: 1 }),
+    ];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.midiRange.min).toBeGreaterThanOrEqual(21);
+    expect(options.midiRange.max).toBeLessThanOrEqual(108);
+  });
+
+  test("pxPerSec fits the total duration into the canvas width", () => {
+    const notes = [makeNote({ midi: 60, start: 0, duration: 10 })]; // ends at 10s
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.pxPerSec * 10).toBeCloseTo(700, 0);
+  });
+
+  test("pxPerSec is clamped for a very short clip instead of exploding", () => {
+    const notes = [makeNote({ midi: 60, start: 0, duration: 0.01 })];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.pxPerSec).toBeLessThanOrEqual(200);
+  });
+
+  test("pxPerSec is clamped for a very long clip instead of collapsing to near-zero", () => {
+    const notes = [makeNote({ midi: 60, start: 0, duration: 600 })];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.pxPerSec).toBeGreaterThanOrEqual(5);
+  });
+
+  test("total duration uses the latest note end, not just the last note in array order", () => {
+    const notes = [
+      makeNote({ id: "a", midi: 60, start: 5, duration: 1 }), // ends at 6
+      makeNote({ id: "b", midi: 62, start: 0, duration: 2 }), // ends at 2
+    ];
+    const options = fitSkylineOptions(notes, 700, 200);
+    expect(options.pxPerSec * 6).toBeCloseTo(700, 0);
   });
 });

@@ -30,12 +30,12 @@ in the browser console, or the Import section reporting a decode failure), conve
 outside the app with ffmpeg:
 
 ```
-ffmpeg -i input.<ext> -ac 1 -ar 22050 -t 60 output.wav
+ffmpeg -i input.<ext> -ac 1 -ar 22050 -t 300 output.wav
 ```
 
 - `-ac 1` — downmix to mono (the app would do this anyway via `toMono`)
 - `-ar 22050` — resample to 22050 Hz (the app would do this anyway via `resample`)
-- `-t 60` — keep only the first 60 seconds (v1 test clips are ≤ 60s, see `docs/PLAN.md` section 1)
+- `-t 300` — keep only the first 5 minutes (v1 test clips are ≤ 5 minutes, see `docs/PLAN.md` section 1 / DR-12)
 
 Then import `output.wav` in the app as usual.
 
@@ -45,4 +45,4 @@ For Phase 2 (transcription, from P2.3 on), pick a clip that is:
 - One voice or one instrument, little or no backing track — a full mix produces noisy,
   cluttered transcription (see `docs/PLAN.md` section 5). This is a known limitation,
   not an app bug; vocal separation is deferred (D1).
-- 60 seconds or less.
+- 5 minutes or less.

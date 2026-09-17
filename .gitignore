@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Basic Pitch model assets, copied from node_modules by scripts/copy-model.mjs
+# (predev/prebuild) so they're servable at DEFAULT_MODEL_URL. Not source.
+public/basic-pitch/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
