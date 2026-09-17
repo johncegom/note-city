@@ -102,17 +102,28 @@ once, then follow the triggers below directly without re-deriving them.
 Default mode is **Execute**: doing the task per the Session start protocol
 above. The other three only fire on their specific trigger:
 
-**Advise.** Trigger: you hit a decision that is genuinely ambiguous *and*
-costly to unwind if wrong — the kind that would reasonably become a DR-N
-in `docs/PLAN.md`, but you need input before writing code, not just a
-record after. (Most ambiguity in this repo should already be resolved by
-the human approval gate in the Session start protocol — reach for Advise
-only when that isn't enough, e.g. the ambiguity is technical/architectural
-rather than something to ask Minh.) Action: call the `Agent` tool with
-`model: claude-opus-5`. The prompt must contain only the specific decision
-and the minimum context needed to resolve it — not the whole session
-transcript, not unrelated task history. Wait for the reply before
-continuing Execute; do not proceed on your own guess in the meantime.
+**Advise.** Trigger, stated as an observable condition, not a feeling of
+doubt: before writing code for a task where (a) `docs/PLAN.md` section 3's
+dependency allow-list or the architecture section leaves more than one
+technically valid way to implement it, **and** (b) no existing `DR-N`
+already settles that choice. Concretely: choosing between two allowed
+libraries/approaches for the same task, or deciding a module boundary or
+shared-type (`src/notes/types.ts`) change that other planned modules will
+depend on. This is a filter, not a checkpoint sequence — anything
+answerable by reading `docs/PLAN.md`/`docs/LEDGER.md` is not Advise's job
+(just read it), and anything only Minh can decide (a preference, a product
+call) goes to Minh via the approval gate, not to Advise. Action: write
+your own leaning and the case for/against in one or two lines first, then
+call the `Agent` tool with `model: claude-opus-5`. The prompt must contain
+only the specific decision, your leaning with its for/against, and the
+exact artifacts the decision turns on (the relevant `docs/PLAN.md`
+section verbatim, the relevant type/signature) — not your summary of them,
+not the whole session transcript, not unrelated task history. Ask it to
+name any context it lacked. Wait for the reply before continuing Execute;
+do not proceed on your own guess in the meantime. Afterward, append one
+line to `docs/EAGD-LOG.md`: date, task ID, question, your prior leaning,
+Advise's answer, and which one was taken — this is what the
+re-calibration check below reads.
 
 **Grade.** Trigger: a `[harness]` task's output is finished (tests green,
 code written) and you want an independent check against its DoD before
@@ -142,14 +153,18 @@ lesson scoped to only this one task still goes in the ledger's session-log
 row instead, per the existing Hard rules — Dream is only for the
 repo-wide kind.
 
-**Re-calibration for this mechanism.** If Advise ends up firing on nearly
-every task rather than rarely, the point of routing it to a pricier model
-is gone — come back and either narrow the trigger or drop the model tier.
-If any of the three roles goes a long stretch (several tasks) without
-firing even once despite tasks of the kind it should catch clearly
-happening, that's a sign the trigger is miscalibrated or the role isn't
-needed — name it to Minh and consider removing it rather than leaving it
-as unused ceremony here.
+**Re-calibration for this mechanism.** Read `docs/EAGD-LOG.md` when
+checking this. If Advise ends up firing on nearly every task rather than
+rarely, the point of routing it to a pricier model is gone — come back and
+either narrow the trigger or drop the model tier. If Advise's answers
+almost always match your prior leaning (the log's "which was taken" column
+is nearly always "prior leaning"), the calls are ceremony — the answer was
+always what Execute would have done anyway; consider dropping Advise. If
+any of the three roles goes a long stretch (several tasks) without firing
+even once despite tasks of the kind it should catch clearly happening,
+that's a sign the trigger is miscalibrated or the role isn't needed — name
+it to Minh and consider removing it rather than leaving it as unused
+ceremony here.
 
 ## Full plan and history
 

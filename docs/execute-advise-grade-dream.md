@@ -74,9 +74,27 @@ phases.
 
 ## Re-calibration
 
+`docs/EAGD-LOG.md` records one row per Advise call (date, task, question,
+prior leaning, answer, which was taken) — it's the only durable record of
+how often Advise fires and whether it changes anything, so the checks
+below read it rather than relying on memory across sessions.
+
 If Advise ends up firing on nearly every task rather than rarely, the
 token-saving premise behind routing it to a pricier model stops paying for
 itself — come back and either narrow the trigger or drop to a cheaper
-model. If any of the three roles goes a long stretch without ever firing,
-that's a sign the trigger is miscalibrated or the role isn't actually
-needed — remove it rather than leave it as unused ceremony in `CLAUDE.md`.
+model. If the log shows Advise's answer rarely differs from the prior
+leaning, the calls are ceremony — the answer was always what Execute would
+have done anyway — and Advise is a candidate for removal. If any of the
+three roles goes a long stretch without ever firing, that's a sign the
+trigger is miscalibrated or the role isn't actually needed — remove it
+rather than leave it as unused ceremony in `CLAUDE.md`.
+
+## Re-calibration history
+
+- 2026-09-18: ran `/bootstrap-eagd-pattern` again on an already-installed
+  mechanism. Kept Grade and Dream unchanged (no evidence they were
+  mis-firing). Narrowed Advise's trigger from a felt-doubt phrasing
+  ("genuinely ambiguous and costly") to an observable one (allow-list/
+  architecture leaves >1 valid approach and no DR-N covers it), and added
+  `docs/EAGD-LOG.md` so a future re-calibration has real firing-rate data
+  instead of impressions.
