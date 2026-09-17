@@ -15,48 +15,25 @@ import type { Note } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <div class="wrap">
-  <header class="hero">
-    <h1 class="wordmark">note&#8209;city</h1>
-    <p class="tagline">
-      A small tool for building melodies. Every note is a building — taller
-      means higher, wider means longer.
-    </p>
-    <div class="button-row">
-      <button id="play-c4" type="button">Play C4</button>
-      <button id="play-c5" type="button">Play C5</button>
-    </div>
+  <header class="top-bar">
+    <h1 class="wordmark-small">note&#8209;city</h1>
+    <p class="tagline-small">Every note is a building &mdash; taller means higher, wider means longer.</p>
   </header>
 
-  <section id="skyline-section" class="panel">
-    <h2>Skyline</h2>
-    <p class="hint">
-      Click empty space to add a building. Drag a building up or down to
-      change its pitch. Drag its right edge to change its length. Hover to
-      see its note name. Press Play to hear it all and watch the playhead.
-    </p>
-
-    <div class="canvas-frame">
-      <canvas id="skyline" width="700" height="200"></canvas>
+  <section id="skyline-section" class="stage">
+    <div class="canvas-frame stage-canvas-frame">
+      <canvas id="skyline" width="760" height="240"></canvas>
     </div>
     <div id="hover-label" class="readout">&nbsp;</div>
-
-    <p class="hint">Double-click a building to delete it.</p>
-
     <div class="button-row">
       <button id="play-skyline" type="button" class="primary">Play</button>
       <button id="stop-skyline" type="button">Stop</button>
       <button id="undo-skyline" type="button" disabled>Undo</button>
       <button id="clear-skyline" type="button">Clear all</button>
     </div>
-
-    <div class="presets">
-      <p class="presets-label">Examples</p>
-      <div class="button-row">
-        <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
-        <button id="preset-1" type="button">Mary Had a Little Lamb</button>
-        <button id="preset-2" type="button">Ode to Joy (opening)</button>
-      </div>
-    </div>
+    <p class="hint stage-hint">
+      Click empty space to add a building, drag to tune pitch/length, double-click to delete.
+    </p>
   </section>
 
   <section id="import-section" class="panel">
@@ -67,11 +44,34 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       skyline above &mdash; replacing whatever's there now.
     </p>
     <input id="import-file" type="file" accept="audio/*,video/*" />
-    <div id="import-status" class="readout">&nbsp;</div>
+    <div id="import-status" class="import-status">
+      <span id="import-spinner" class="spinner" hidden></span>
+      <span id="import-status-text" class="readout">&nbsp;</span>
+    </div>
+    <progress id="import-progress" class="import-progress" max="100" value="0" hidden></progress>
     <div class="button-row">
       <button id="play-original" type="button" disabled>Play original audio</button>
       <button id="play-synth-song" type="button" disabled>Play synth</button>
       <button id="stop-song" type="button">Stop</button>
+    </div>
+  </section>
+
+  <section id="editor-section" class="panel">
+    <h2>Build by hand</h2>
+    <p class="hint">
+      A few well-known example melodies, or start from two reference notes.
+    </p>
+    <div class="presets">
+      <p class="presets-label">Examples</p>
+      <div class="button-row">
+        <button id="preset-0" type="button">Twinkle Twinkle Little Star</button>
+        <button id="preset-1" type="button">Mary Had a Little Lamb</button>
+        <button id="preset-2" type="button">Ode to Joy (opening)</button>
+      </div>
+    </div>
+    <div class="button-row">
+      <button id="play-c4" type="button">Play C4</button>
+      <button id="play-c5" type="button">Play C5</button>
     </div>
   </section>
 </div>
@@ -117,7 +117,7 @@ const notes: Note[] = SEED_MIDIS.map((midi, i) => ({
 const DEFAULT_SKYLINE_OPTIONS: SkylineOptions = {
   midiRange: { min: 60, max: 72 },
   pxPerSec: 100,
-  canvasHeight: 200,
+  canvasHeight: 240,
 };
 let skylineOptions: SkylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
 
@@ -460,46 +460,84 @@ const MERGE_GAP_SEC = 0.05;
 let originalPcm: Float32Array | null = null;
 let originalDurationSec = 0;
 
-const importStatus = document.querySelector<HTMLDivElement>("#import-status")!;
+const importStatusText = document.querySelector<HTMLSpanElement>("#import-status-text")!;
+const importSpinner = document.querySelector<HTMLSpanElement>("#import-spinner")!;
+const importProgress = document.querySelector<HTMLProgressElement>("#import-progress")!;
+const importFileInput = document.querySelector<HTMLInputElement>("#import-file")!;
 const playOriginalButton = document.querySelector<HTMLButtonElement>("#play-original")!;
 const playSynthSongButton = document.querySelector<HTMLButtonElement>("#play-synth-song")!;
 
-document
-  .querySelector<HTMLInputElement>("#import-file")!
-  .addEventListener("change", async (event) => {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    playOriginalButton.disabled = true;
-    playSynthSongButton.disabled = true;
-    importStatus.textContent = `Decoding ${file.name}...`;
-    try {
-      const pcm = await decodeFile(file);
-      originalPcm = pcm;
-      originalDurationSec = pcm.length / TARGET_SAMPLE_RATE;
+// So Minh can tell running/hung/errored apart at every moment (docs/BUGS.md
+// BUG-6) instead of one static line that doesn't change until the whole
+// pipeline finishes. "transcribing" gets a real percentage from Basic
+// Pitch's own progress callback (see docs/PLAN.md DR-13) since decode has no
+// such hook and is fast in practice, a spinner is enough for it.
+type ImportStage = "decoding" | "transcribing" | "done" | "error";
 
-      importStatus.textContent = `Transcribing ${file.name}... (this can take a while)`;
-      const raw = await transcribe(pcm);
-      const cleaned = mergeAdjacent(
-        filterShort(filterLowConfidence(raw, MIN_CONFIDENCE), MIN_NOTE_DURATION_SEC),
-        MERGE_GAP_SEC,
-      );
+function setImportStage(
+  stage: ImportStage,
+  fileName: string,
+  percent?: number,
+  noteCount?: number,
+  errorMessage?: string,
+) {
+  importStatus.className = `import-status import-status--${stage}`;
+  importSpinner.hidden = stage !== "decoding";
+  importProgress.hidden = stage !== "transcribing";
+  if (stage === "transcribing") importProgress.value = Math.round((percent ?? 0) * 100);
 
-      recordHistory();
-      notes.length = 0;
-      notes.push(...cleaned);
-      skylineOptions = fitSkylineOptions(notes, canvas.width, skylineOptions.canvasHeight);
-      playheadTime = undefined;
-      render();
+  if (stage === "decoding") {
+    importStatusText.textContent = `Decoding ${fileName}...`;
+  } else if (stage === "transcribing") {
+    importStatusText.textContent = `Transcribing ${fileName}... ${Math.round((percent ?? 0) * 100)}%`;
+  } else if (stage === "done") {
+    importStatusText.textContent =
+      `${fileName}: ${originalDurationSec.toFixed(2)}s, ${noteCount} notes found`;
+  } else {
+    importStatusText.textContent = `Failed to process ${fileName}: ${errorMessage}`;
+  }
+}
 
-      importStatus.textContent =
-        `${file.name}: ${originalDurationSec.toFixed(2)}s, ${cleaned.length} notes found`;
-      playOriginalButton.disabled = false;
-      playSynthSongButton.disabled = notes.length === 0;
-    } catch (err) {
-      originalPcm = null;
-      importStatus.textContent = `Failed to process ${file.name}: ${(err as Error).message}`;
-    }
-  });
+const importStatus = document.querySelector<HTMLDivElement>("#import-status")!;
+
+importFileInput.addEventListener("change", async (event) => {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  playOriginalButton.disabled = true;
+  playSynthSongButton.disabled = true;
+  importFileInput.disabled = true;
+  setImportStage("decoding", file.name);
+  try {
+    const pcm = await decodeFile(file);
+    originalPcm = pcm;
+    originalDurationSec = pcm.length / TARGET_SAMPLE_RATE;
+
+    setImportStage("transcribing", file.name, 0);
+    const raw = await transcribe(pcm, undefined, (percent) => {
+      setImportStage("transcribing", file.name, percent);
+    });
+    const cleaned = mergeAdjacent(
+      filterShort(filterLowConfidence(raw, MIN_CONFIDENCE), MIN_NOTE_DURATION_SEC),
+      MERGE_GAP_SEC,
+    );
+
+    recordHistory();
+    notes.length = 0;
+    notes.push(...cleaned);
+    skylineOptions = fitSkylineOptions(notes, canvas.width, skylineOptions.canvasHeight);
+    playheadTime = undefined;
+    render();
+
+    setImportStage("done", file.name, undefined, cleaned.length);
+    playOriginalButton.disabled = false;
+    playSynthSongButton.disabled = notes.length === 0;
+  } catch (err) {
+    originalPcm = null;
+    setImportStage("error", file.name, undefined, undefined, (err as Error).message);
+  } finally {
+    importFileInput.disabled = false;
+  }
+});
 
 // Plays the decoded PCM directly (not through notes/synth), so Minh can
 // compare the skyline against the real recording. Playhead uses the same
