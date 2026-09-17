@@ -62,7 +62,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <section id="import-section" class="panel">
     <h2>Load a real song</h2>
     <p class="hint">
-      Pick an audio or video file (&le; 60s works best). It's decoded, run
+      Pick an audio or video file (&le; 5 minutes works best). It's decoded, run
       through Basic Pitch to find notes, cleaned up, then drawn on the
       skyline above &mdash; replacing whatever's there now.
     </p>
@@ -360,18 +360,39 @@ function stopPlayback() {
   render();
 }
 
+// How far ahead of "now" to create oscillators for. Creating one per note
+// up front (docs/BUGS.md BUG-5) is fine for a short hand-placed melody, but
+// a 5-minute real song can have thousands of notes — building that many
+// OscillatorNode/GainNode pairs synchronously in one go measurably delays
+// when the audio graph starts actually producing sound. Scheduling only the
+// next few seconds' worth at a time, and topping up on every tick, keeps
+// the number of live nodes small regardless of the song's total length.
+const SCHEDULE_AHEAD_SEC = 2;
+
 function playAll() {
   if (notes.length === 0) return;
   stopPlayback();
   ctx ??= new AudioContext();
   const now = ctx.currentTime;
-  const events = schedule(notes, now);
-  activeOscillators = events.map((event) => playNote(ctx!, event.freq, event.at, event.dur));
+  const events = schedule(notes, now); // sorted by .at, since notes are sorted by start
+  let nextEventIndex = 0;
 
   const totalDuration = Math.max(...notes.map((note) => note.start + note.duration));
 
+  function scheduleDueEvents() {
+    const horizon = ctx!.currentTime + SCHEDULE_AHEAD_SEC;
+    while (nextEventIndex < events.length && events[nextEventIndex].at < horizon) {
+      const event = events[nextEventIndex];
+      activeOscillators.push(playNote(ctx!, event.freq, event.at, event.dur));
+      nextEventIndex++;
+    }
+  }
+
+  scheduleDueEvents();
+
   function tick() {
     const elapsed = ctx!.currentTime - now;
+    scheduleDueEvents();
     if (elapsed >= totalDuration) {
       playheadTime = undefined;
       activeOscillators = [];

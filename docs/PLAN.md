@@ -65,7 +65,7 @@ Read carefully. These rules win over any ad-hoc judgment.
 ### Assumptions (correct if wrong)
 - The project lives in a git repo on Minh's machine. Not in the chat container (it resets every session).
 - Primary browser is latest Chrome.
-- Initial test clips are ≤ 60 seconds.
+- Initial test clips are ≤ 5 minutes (was ≤ 60 seconds; changed at P2.5 — see DR-12).
 
 ### Unknowns (do not guess)
 - How much time Minh spends per week. So the plan is split into **phases**, not calendar dates. A phase counts when it is finished.
@@ -202,13 +202,13 @@ The model needs **raw audio samples** (PCM). Every other format is just a wrappe
 
 Generic fallback command, run outside the app:
 ```
-ffmpeg -i input.<ext> -ac 1 -ar 22050 -t 60 output.wav
+ffmpeg -i input.<ext> -ac 1 -ar 22050 -t 300 output.wav
 ```
-(`-ac 1` mono, `-ar 22050` sample rate, `-t 60` first 60 seconds)
+(`-ac 1` mono, `-ar 22050` sample rate, `-t 300` first 5 minutes — see DR-12)
 
 Inside the app, after decoding, always normalize to: **mono, 22050 Hz, Float32Array**. Basic Pitch resamples to 22050 itself, so anything higher is wasted. Mono because pitch does not depend on left/right channel.
 
-Rule for choosing a test clip at Phase 2: one voice or one instrument, little backing, ≤ 60 seconds. A full mix will produce noisy notes — that is why source separation is Deferred, not an app bug.
+Rule for choosing a test clip at Phase 2: one voice or one instrument, little backing, ≤ 5 minutes. A full mix will produce noisy notes — that is why source separation is Deferred, not an app bug.
 
 ---
 
@@ -254,7 +254,7 @@ Goal: file/video/YouTube → skyline → original audio plays in sync with the p
 | P2.2 | Write `docs/input.md`: YouTube → `youtube-mcp download_audio` → file procedure; ffmpeg fallback command. No code. | skill | — | 0.5 session | Minh follows the doc and gets a wav file from a YouTube link. |
 | P2.3 | `src/transcribe/basicPitch.ts`: add `@spotify/basic-pitch` + tfjs. `transcribe(pcm) → RawNote[]`. Contract test: 440 Hz sine, 1 s → a RawNote with midi 69, duration 0.8–1.2 s. Test 2: two sines in sequence (440 then 880) → 2 notes, midi 69 then 81, in order. | harness (contract) | P2.1 | 2 sessions | Both contract tests green. Sine fixtures generated in code; no wav files committed. |
 | P2.4 | `src/notes/clean.ts`: `filterShort(notes, minDur)`, `filterLowConfidence(notes, min)`, `mergeAdjacent(notes, gap)` — same midi, gap smaller than threshold → merge. | harness | P2.3 | 1 session | Tests first, including edges: empty array, one note, two notes with the same start. |
-| P2.5 | Wire: file → decode → transcribe → clean → skyline. Toggle "play original" / "play synth". Playhead synced to the original. | skill | P2.1, P2.3, P2.4 | 1–2 sessions | **Phase 2 final checkpoint:** Minh loads a clean clip ≤ 60 s. Minh points to at least 1 place where the skyline matches the ear, and 1 place where it does not (if any). Record both. |
+| P2.5 | Wire: file → decode → transcribe → clean → skyline. Toggle "play original" / "play synth". Playhead synced to the original. | skill | P2.1, P2.3, P2.4 | 1–2 sessions | **Phase 2 final checkpoint:** Minh loads a clean clip ≤ 5 minutes (see DR-12). Minh points to at least 1 place where the skyline matches the ear, and 1 place where it does not (if any). Record both. |
 
 **Phase 2 contingency:** estimate 5.5–7.5 sessions. Hold ~30% (2 sessions) — higher than Phase 1 because tfjs model loading, browser codecs, and transcription quality are all unknowns outside our control.
 
@@ -304,7 +304,7 @@ Goal: file/video/YouTube → skyline → original audio plays in sync with the p
 
 | Risk | Signal | Fallback |
 |---|---|---|
-| tfjs + Basic Pitch slow / heavy | > 10 s for 30 s of audio | Cap at 60 s. Show a progress bar. If still bad: move transcription to a Python CLI outside the app; the app only reads JSON (option 1 stays for everything else). |
+| tfjs + Basic Pitch slow / heavy | > 10 s for 30 s of audio | Cap at 5 minutes (see DR-12). Show a progress bar. If still bad: move transcription to a Python CLI outside the app; the app only reads JSON (option 1 stays for everything else). |
 | Browser codec cannot decode | `decodeAudioData` rejects | ffmpeg → wav outside the app. See section 5. |
 | Noisy transcription on a real song | many tiny buildings | Pick a cleaner clip. Raise filter thresholds. Do not change the model. Note it for D1 consideration. |
 | Canvas drag eats time | P1.5 exceeds 2× estimate | Cut to vertical drag only. Change duration via a number input. |
@@ -366,12 +366,15 @@ Problem: post-P1.10, an agent brainstorm produced 3 UX ideas (instant micro-feed
 **DR-11. `resample` (P2.1) is exempt from the TDD hard rule; `toMono` stays TDD'd.**
 Problem: section 0 rule 3 requires tests-before-implementation for harness pure functions, and P2.1's DoD names `resample` alongside `toMono` as if both were pure — but the DoD also specifies `resample` uses `OfflineAudioContext`, a Web Audio API with no real implementation or polyfill available in the vitest/Node test environment (jsdom is not on the allow-list, and existing polyfills for it are approximations, not real behavior). Choice: implement `resample` as a thin (~10-line) wrapper directly on `OfflineAudioContext`, unautomated-tested, verified manually in-browser (decode a known file, assert `sampleRate === 22050` and duration preserved); `toMono` stays a genuinely pure function, TDD'd as normal. Why not hand-roll resampling to make it Node-testable: naive linear interpolation has no anti-aliasing filter, so downsampling 44100→22050 folds content above 11 kHz back into the audible band as aliases — this lands directly on Basic Pitch's input at P2.3 and can produce phantom pitches; `OfflineAudioContext` gives a correct resampler for free, and trading that for testability optimizes the process at the product's expense. Why not add a jsdom Web Audio polyfill: buys a dependency (violates "subtract before add") without buying real test coverage, since no available polyfill implements actual resampling DSP. Decided via the repo's Advise mechanism (`claude-opus-5`, 2026-09-17). Revisit when: a real Web Audio test environment becomes available/needed for another task, or `resample`'s wrapper grows non-trivial logic beyond the `OfflineAudioContext` call itself — then reconsider testing it.
 
+**DR-12. Raise the target input length from ≤ 60 seconds to ≤ 5 minutes; fix `playAll`'s scheduler to not stall on long clips.**
+Problem: during the P2.5 checkpoint, Minh loaded a real 270.62s song ("LAVIEM.mp3"), which transcribed to 2336 notes; "Play synth"/the skyline's "Play" produced no audible sound (BUG-5), while "Play original audio" worked fine. Investigation (synthetic reproductions in the browser, not guesswork) found the cause: `playAll` created one `OscillatorNode`/`GainNode` pair per note *up front*, all at once — for 2336 notes this delayed the first audible sound by roughly a second in testing (500 notes over 60s: sound starts within ~100ms; 2336 notes over 270s: silence for ~900ms+ first). `playOriginal` has no such delay since it plays one pre-rendered `AudioBufferSourceNode`, not one node per note. Minh then said the product isn't worth much unless it can handle up to 5-minute inputs. Choice: (a) raise the target/assumed input length everywhere from ≤60s to ≤5min (this file's Assumptions, section 5's ffmpeg fallback and clip-picking rule, the risk table, P2.5's checkpoint wording); (b) fix `playAll` with a lookahead scheduler (schedule only the next `SCHEDULE_AHEAD_SEC = 2` seconds of notes at a time, topping up every animation-frame tick) — a standard Web Audio pattern for exactly this class of problem, not a novel design — so the number of live nodes stays small (tens, not thousands) regardless of song length. Why not just cap input at 60s (the previously-parked idea) instead: that was Minh's own product judgment call, made after seeing the bug — a hard cap would work around the symptom rather than fix the actual scaling problem, and 60s of real material is often too short to judge "does this sound like the song" against. Why not reduce note counts instead (raise `clean.ts`'s default filter thresholds for long clips) as the primary fix: that trades fidelity for a symptom that's actually a scheduling architecture problem, not a note-count problem — the lookahead scheduler fixes the root cause without touching transcription quality. Revisit when: a real clip near 5 minutes shows transcription (not playback) itself is too slow or the canvas redraws thousands of buildings every animation frame slowly enough to matter — neither observed yet, but flagged as things to watch, not built preemptively (see docs/BUGS.md BUG-5 and docs/LEDGER.md section 6's superseded 60s-cap parked idea).
+
 ---
 
 ## 11. Open questions
 
 Recorded here; answers go in the ledger.
 
-- Q1. What is the first song Minh wants to try at Phase 2? Is there a ≤ 60 s section with only voice or one instrument?
+- Q1. What is the first song Minh wants to try at Phase 2? Is there a ≤ 5 minute section with only voice or one instrument?
 - Q2. Is Minh's main browser Chrome? (affects section 5)
 - Q3. After Phase 1, does Minh want note names in English (C D E) or Vietnamese/solfège (Đô Rê Mi)? The app can show both, but one should be the default.
