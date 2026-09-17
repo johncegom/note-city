@@ -71,4 +71,17 @@ describe('transcribe (Basic Pitch contract tests)', () => {
     expect(notes[1].midi).toBe(81);
     expect(notes[0].start).toBeLessThan(notes[1].start);
   }, 30_000);
+
+  it('calls onProgress with increasing values reaching 1.0', async () => {
+    const pcm = makeSine(440, 1.0, 22050);
+    const progressValues: number[] = [];
+
+    await transcribe(pcm, model, (percent) => progressValues.push(percent));
+
+    expect(progressValues.length).toBeGreaterThan(0);
+    expect(progressValues[progressValues.length - 1]).toBe(1.0);
+    for (let i = 1; i < progressValues.length; i++) {
+      expect(progressValues[i]).toBeGreaterThanOrEqual(progressValues[i - 1]);
+    }
+  }, 30_000);
 });

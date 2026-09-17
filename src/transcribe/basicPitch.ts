@@ -14,6 +14,7 @@ export const DEFAULT_MODEL_URL = '/basic-pitch/model/model.json';
 export async function transcribe(
   pcm: Float32Array,
   modelSource: string | Promise<tf.GraphModel> = DEFAULT_MODEL_URL,
+  onProgress?: (percent: number) => void,
 ): Promise<RawNote[]> {
   await tf.ready();
 
@@ -28,7 +29,7 @@ export async function transcribe(
       onsets.push(...o);
       contours.push(...c);
     },
-    () => {},
+    onProgress ?? (() => {}),
   );
 
   const notes = noteFramesToTime(addPitchBendsToNoteEvents(contours, outputToNotesPoly(frames, onsets)));
