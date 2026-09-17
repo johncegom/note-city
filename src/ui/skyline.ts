@@ -16,6 +16,8 @@ const WINDOW_UNLIT_OUTLINE = "rgba(138, 90, 28, 0.35)";
 const PLAYHEAD_COLOR = "#7dd3e8";
 const POP_RING_COLOR = "#7dd3e8";
 const EDGE_STOP_COLOR = "#e86b5c";
+const HOVER_AFFORDANCE_COLOR = "#7dd3e8";
+const HOVER_AFFORDANCE_THICKNESS = 4; // px
 
 const WINDOW_WIDTH = 3;
 const WINDOW_HEIGHT = 5;
@@ -65,10 +67,15 @@ function drawWindows(ctx: CanvasRenderingContext2D, rect: Rect, seed: string): v
 
 // Instant feedback for the P1.11 editor: a brief "pop" ring on placement, and
 // a stop-cue highlight when a drag is pressed against the P1.10 canvas edge.
+// hoverNoteId/hoverMode (P3.1) highlight which part of a building a drag
+// would grab, before the drag starts — top strip for pitch, right-edge strip
+// for duration, matching main.ts's own nearRightEdge threshold.
 export type SkylineEffects = {
   popNoteId?: string;
   popProgress?: number; // 0 (just placed) .. 1 (fully faded)
   edgeStopCue?: boolean;
+  hoverNoteId?: string;
+  hoverMode?: "pitch" | "duration";
 };
 
 /** Draw `notes` as buildings: taller = higher pitch, wider = longer note. */
@@ -112,6 +119,20 @@ export function drawSkyline(
       ctx.strokeStyle = POP_RING_COLOR;
       ctx.lineWidth = 2;
       ctx.strokeRect(rect.x - pad, rect.y - pad, rect.width + pad * 2, rect.height + pad * 2);
+      ctx.restore();
+    }
+
+    if (effects?.hoverNoteId === note.id) {
+      ctx.save();
+      ctx.fillStyle = HOVER_AFFORDANCE_COLOR;
+      ctx.globalAlpha = 0.7;
+      if (effects.hoverMode === "duration") {
+        // Right-edge strip: drag here to change how long the note lasts.
+        ctx.fillRect(rect.x + rect.width - HOVER_AFFORDANCE_THICKNESS, rect.y, HOVER_AFFORDANCE_THICKNESS, rect.height);
+      } else {
+        // Top strip: drag anywhere else on the building to change its pitch.
+        ctx.fillRect(rect.x, rect.y, rect.width, HOVER_AFFORDANCE_THICKNESS);
+      }
       ctx.restore();
     }
   }

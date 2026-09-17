@@ -267,7 +267,7 @@ Goal: file/video/YouTube → skyline → original audio plays in sync with the p
 
 | ID | Task | Type | Dependency | Effort (est.) | DoD |
 |---|---|---|---|---|---|
-| P3.1 | Editor (P1.5) works on transcribed notes. "Play synth of edited version" button. | skill | Phase 2 done | 1 session | Minh edits 3 notes of a real song, listens, says how it differs from the original. |
+| P3.1 | Editor (P1.5) works on transcribed notes. "Play synth of edited version" button. Fix BUGS.md BUG-7 (real-song skyline too dense to edit) if it reproduces. Hover affordance on a building's editable spots (top = pitch, right edge = duration), added mid-task at Minh's request. | skill | Phase 2 done | 1 session | Minh edits 3 notes of a real song, listens, says how it differs from the original; confirms editing is possible even on a dense real song; confirms the hover cues make it clear where a drag will grab. |
 | P3.2 | Save/load `Project` JSON (download/upload file). localStorage for work in progress. | harness | P3.1 | 1 session | Round-trip test: `parse(serialize(p))` equals `p`. |
 | P3.3 | Export MIDI file (only if Minh wants to open it in another tool). Small pure encoder, TDD. | harness | P3.2 | 1–2 sessions | Test: 1 note → correct header + track bytes. File opens in any MIDI tool. |
 
