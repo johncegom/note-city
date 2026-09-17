@@ -119,14 +119,32 @@ const DEFAULT_SKYLINE_OPTIONS: SkylineOptions = {
   pxPerSec: 100,
   canvasHeight: 240,
 };
+const DEFAULT_CANVAS_WIDTH = 760; // matches the <canvas> element's own width attribute
 let skylineOptions: SkylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
 
 const canvas = document.querySelector<HTMLCanvasElement>("#skyline")!;
 const canvasCtx = canvas.getContext("2d")!;
 const hoverLabel = document.querySelector<HTMLDivElement>("#hover-label")!;
 
+// The canvas's own pixel width only grows past DEFAULT_CANVAS_WIDTH for a
+// real song loaded via the Import section (see fitSkylineOptions /
+// docs/BUGS.md BUG-7) — a long clip needs a wider drawing surface to keep
+// notes individually clickable, and `.canvas-frame`'s overflow-x: auto
+// scrolls to it. Resetting the canvas element's width clears its content, so
+// callers must re-render() right after.
+function resetCanvasWidth() {
+  canvas.width = DEFAULT_CANVAS_WIDTH;
+}
+
 let playheadTime: number | undefined;
 let effects: SkylineEffects = {};
+
+// Hover affordance (P3.1): which part of a building the cursor is over right
+// now, so main.ts's own drag-mode logic (see nearRightEdge below) has a
+// visible cue *before* a drag starts, not just a cursor change after the
+// fact. Cleared while a drag is in progress — effects/edgeStopCue take over then.
+let hoverNoteId: string | undefined;
+let hoverMode: "pitch" | "duration" | undefined;
 
 // In-memory undo (P1.11): a stack of full `notes` snapshots, no persistence.
 // Each mutating action pushes the pre-edit state before applying the change.
@@ -143,7 +161,8 @@ function recordHistory() {
 }
 
 function render() {
-  drawSkyline(canvasCtx, notes, skylineOptions, playheadTime, effects);
+  const activeEffects: SkylineEffects = dragState ? effects : { ...effects, hoverNoteId, hoverMode };
+  drawSkyline(canvasCtx, notes, skylineOptions, playheadTime, activeEffects);
 }
 
 // Instant micro-feedback (P1.11a): a brief highlight ring on a newly placed note.
@@ -172,14 +191,33 @@ function pointFromEvent(event: MouseEvent) {
 // Solfège (Đô Rê Mi...) is the default label — Minh knows that, not letter
 // names — with the letter name alongside for cross-reference (docs/PLAN.md DR-8).
 canvas.addEventListener("mousemove", (event) => {
-  const hovered = findNoteAt(notes, pointFromEvent(event), skylineOptions);
+  if (dragState) return; // the window-level drag mousemove handler owns rendering during a drag
+  const point = pointFromEvent(event);
+  const hovered = findNoteAt(notes, point, skylineOptions);
   hoverLabel.textContent = hovered
     ? `${midiToSolfege(hovered.midi)} (${midiToName(hovered.midi)})`
     : " ";
+
+  if (hovered) {
+    const rect = noteRect(hovered, skylineOptions);
+    const nearRightEdge = point.x >= rect.x + rect.width - EDGE_GRAB_PX;
+    hoverNoteId = hovered.id;
+    hoverMode = nearRightEdge ? "duration" : "pitch";
+    canvas.style.cursor = nearRightEdge ? "ew-resize" : "ns-resize";
+  } else {
+    hoverNoteId = undefined;
+    hoverMode = undefined;
+    canvas.style.cursor = "crosshair";
+  }
+  render();
 });
 
 canvas.addEventListener("mouseleave", () => {
   hoverLabel.textContent = " ";
+  hoverNoteId = undefined;
+  hoverMode = undefined;
+  canvas.style.cursor = "default";
+  render();
 });
 
 // --- Editor: click empty space to add a building, drag to edit one. ---
@@ -322,6 +360,7 @@ document
     recordHistory();
     notes.length = 0;
     skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
+    resetCanvasWidth();
     playheadTime = undefined;
     render();
   });
@@ -436,6 +475,7 @@ function loadMelody(midis: number[]) {
     });
   });
   skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
+  resetCanvasWidth();
   playheadTime = undefined;
   render();
 }
@@ -524,7 +564,12 @@ importFileInput.addEventListener("change", async (event) => {
     recordHistory();
     notes.length = 0;
     notes.push(...cleaned);
-    skylineOptions = fitSkylineOptions(notes, canvas.width, skylineOptions.canvasHeight);
+    // viewportWidth is always the frame's own width (DEFAULT_CANVAS_WIDTH), not
+    // the current canvas.width — that may already be widened from a previous
+    // long import, and feeding it back in would let the canvas only ever grow.
+    const fit = fitSkylineOptions(notes, DEFAULT_CANVAS_WIDTH, skylineOptions.canvasHeight);
+    skylineOptions = fit.options;
+    canvas.width = fit.canvasWidth;
     playheadTime = undefined;
     render();
 
