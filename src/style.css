@@ -152,6 +152,29 @@ button:disabled:hover {
   color: var(--text);
 }
 
+.file-button {
+  font: 500 14px/1 var(--sans);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+
+.file-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.file-button input[type="file"] {
+  display: none;
+}
+
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
