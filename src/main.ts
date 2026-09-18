@@ -11,7 +11,8 @@ import { pushHistory, undo } from "./ui/history";
 import { decodeFile, TARGET_SAMPLE_RATE } from "./audio/decode";
 import { transcribe } from "./transcribe/basicPitch";
 import { filterLowConfidence, filterShort, mergeAdjacent } from "./notes/clean";
-import type { Note } from "./notes/types";
+import { parse, serialize } from "./notes/project";
+import type { Note, Project } from "./notes/types";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <div class="wrap">
@@ -30,6 +31,11 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <button id="stop-skyline" type="button">Stop</button>
       <button id="undo-skyline" type="button" disabled>Undo</button>
       <button id="clear-skyline" type="button">Clear all</button>
+      <button id="save-project" type="button">Save</button>
+      <label class="file-button">
+        Load
+        <input id="load-project" type="file" accept="application/json,.json" />
+      </label>
     </div>
     <p class="hint stage-hint">
       Click empty space to add a building, drag to tune pitch/length, double-click to delete.
@@ -160,6 +166,39 @@ function recordHistory() {
   undoButton.disabled = historyStack.length === 0;
 }
 
+// P3.2: save/load Project JSON, plus a localStorage autosave of the current
+// in-progress melody so a page reload doesn't lose it. `sourceName` tracks
+// where the current notes came from (an imported file, a loaded project) for
+// display/re-save purposes only — it isn't part of the P1.11 undo history.
+let sourceName: string | undefined;
+const WORK_IN_PROGRESS_KEY = "note-city:work-in-progress";
+
+function currentProject(): Project {
+  const project: Project = { version: 1, notes: snapshotNotes() };
+  if (sourceName) project.sourceName = sourceName;
+  return project;
+}
+
+function persistWorkInProgress() {
+  try {
+    localStorage.setItem(WORK_IN_PROGRESS_KEY, serialize(currentProject()));
+  } catch {
+    // localStorage unavailable (private mode, quota, etc.) — autosave is
+    // best-effort, not a feature the rest of the app depends on.
+  }
+}
+
+// Returns the restored project, or null if there was nothing to restore
+// (first visit, or the saved data was cleared/corrupt).
+function restoreWorkInProgress(): Project | null {
+  try {
+    const saved = localStorage.getItem(WORK_IN_PROGRESS_KEY);
+    return saved ? parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 function render() {
   const activeEffects: SkylineEffects = dragState ? effects : { ...effects, hoverNoteId, hoverMode };
   drawSkyline(canvasCtx, notes, skylineOptions, playheadTime, activeEffects);
@@ -273,6 +312,7 @@ canvas.addEventListener("mousedown", (event) => {
     const note = addNoteAt(point);
     if (!note) return;
     render();
+    persistWorkInProgress();
     triggerPop(note.id);
     playSingleNote(note);
     return;
@@ -300,6 +340,7 @@ canvas.addEventListener("dblclick", (event) => {
   playheadTime = undefined;
   hoverLabel.textContent = " ";
   render();
+  persistWorkInProgress();
 });
 
 window.addEventListener("mousemove", (event) => {
@@ -339,6 +380,7 @@ window.addEventListener("mouseup", () => {
     undoButton.disabled = historyStack.length === 0;
   }
   render();
+  persistWorkInProgress();
   playSingleNote(note);
 });
 
@@ -351,6 +393,7 @@ undoButton.addEventListener("click", () => {
   notes.push(...previous.map((n) => ({ ...n })));
   playheadTime = undefined;
   render();
+  persistWorkInProgress();
 });
 
 document
@@ -359,10 +402,12 @@ document
     if (notes.length === 0) return;
     recordHistory();
     notes.length = 0;
+    sourceName = undefined;
     skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
     resetCanvasWidth();
     playheadTime = undefined;
     render();
+    persistWorkInProgress();
   });
 
 // Tracks whatever's currently playing (skyline melody, or P2.5's original/synth
@@ -474,10 +519,12 @@ function loadMelody(midis: number[]) {
       velocity: 0.8,
     });
   });
+  sourceName = undefined;
   skylineOptions = { ...DEFAULT_SKYLINE_OPTIONS };
   resetCanvasWidth();
   playheadTime = undefined;
   render();
+  persistWorkInProgress();
 }
 
 PRESETS.forEach((midis, i) => {
@@ -564,6 +611,7 @@ importFileInput.addEventListener("change", async (event) => {
     recordHistory();
     notes.length = 0;
     notes.push(...cleaned);
+    sourceName = file.name;
     // viewportWidth is always the frame's own width (DEFAULT_CANVAS_WIDTH), not
     // the current canvas.width — that may already be widened from a previous
     // long import, and feeding it back in would let the canvas only ever grow.
@@ -572,6 +620,7 @@ importFileInput.addEventListener("change", async (event) => {
     canvas.width = fit.canvasWidth;
     playheadTime = undefined;
     render();
+    persistWorkInProgress();
 
     setImportStage("done", file.name, undefined, cleaned.length);
     playOriginalButton.disabled = false;
@@ -621,5 +670,55 @@ playSynthSongButton.addEventListener("click", playAll);
 document
   .querySelector<HTMLButtonElement>("#stop-song")!
   .addEventListener("click", stopPlayback);
+
+// Loads a Project's notes/sourceName into the shared skyline state, refitting
+// the canvas since a saved project (e.g. an edited real song) may need more
+// than the default 760px/60-72 midi scale — same refit as a fresh import.
+function loadProject(project: Project) {
+  recordHistory();
+  notes.length = 0;
+  notes.push(...project.notes);
+  sourceName = project.sourceName;
+  const fit = fitSkylineOptions(notes, DEFAULT_CANVAS_WIDTH, skylineOptions.canvasHeight);
+  skylineOptions = fit.options;
+  canvas.width = fit.canvasWidth;
+  playheadTime = undefined;
+  render();
+  persistWorkInProgress();
+}
+
+document
+  .querySelector<HTMLButtonElement>("#save-project")!
+  .addEventListener("click", () => {
+    const blob = new Blob([serialize(currentProject())], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = sourceName ? `${sourceName}.notecity.json` : "project.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  });
+
+document
+  .querySelector<HTMLInputElement>("#load-project")!
+  .addEventListener("change", async (event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      loadProject(parse(await file.text()));
+    } catch (err) {
+      window.alert(`Could not load ${file.name}: ${(err as Error).message}`);
+    } finally {
+      input.value = "";
+    }
+  });
+
+// A page reload should pick up the last in-progress melody, if any, instead
+// of resetting to the P1.6 seed — this only replaces the seed at startup, it
+// never overwrites the very first localStorage write (that happens on the
+// first mutating action, see persistWorkInProgress's call sites above).
+const workInProgress = restoreWorkInProgress();
+if (workInProgress) loadProject(workInProgress);
 
 render();
